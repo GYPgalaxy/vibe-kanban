@@ -160,3 +160,69 @@ When running Vibe Kanban on a remote server (e.g., via systemctl, Docker, or clo
 When configured, the "Open in VSCode" buttons will generate URLs like `vscode://vscode-remote/ssh-remote+user@host/path` that open your local editor and connect to the remote server.
 
 See the [documentation](https://vibekanban.com/docs/settings/general) for detailed setup instructions.
+
+---
+
+## 本地开发启动指南（中国区）
+
+由于原项目已停止维护（sunsetting），需要先回退日落 commit 恢复完整功能，再启动开发环境。以下是在中国区网络环境下的完整步骤：
+
+### 1. 回退日落 commit
+
+```bash
+git revert --no-commit 9f101503 97123d52
+git commit -m "revert: restore full kanban and workspace functionality"
+```
+
+### 2. 安装 Rust 环境
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+```
+
+安装完成后加载 PATH：
+
+```bash
+source ~/.cargo/env
+```
+
+### 3. 配置 Cargo 使用系统 Git（解决网络问题）
+
+在 `.cargo/config.toml` 末尾添加：
+
+```toml
+[net]
+git-fetch-with-cli = true
+```
+
+这会让 Cargo 使用系统 git 拉取依赖，从而走你的代理。
+
+### 4. 安装开发工具
+
+```bash
+cargo install cargo-watch
+```
+
+### 5. 安装前端依赖
+
+```bash
+pnpm i
+```
+
+### 6. 启动开发服务器
+
+确保代理开启后运行：
+
+```bash
+export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+source ~/.cargo/env
+pnpm run dev
+```
+
+首次启动 Rust 后端编译需要 5-10 分钟，请耐心等待。编译完成后浏览器打开前端页面即可使用。
+
+### 注意事项
+
+- 后端启动时可能出现 `WARN utils::process: Failed to send signal SIGKILL` 警告，不影响正常使用
+- 确保你已安装并登录至少一个 AI 编码代理（如 Claude Code），Vibe Kanban 需要调用它们
+- GitHub OAuth 等云端功能在本地模式下不可用
