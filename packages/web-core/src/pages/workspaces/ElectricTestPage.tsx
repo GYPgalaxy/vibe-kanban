@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
 import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
 import { useCurrentUser } from '@/shared/hooks/auth/useCurrentUser';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { useShape } from '@/shared/integrations/electric/hooks';
 import type { SyncError } from '@/shared/lib/electric/types';
 import {
@@ -886,6 +887,7 @@ function formatDate(dateStr: string): string {
 
 export function ElectricTestPage() {
   const { isSignedIn, isLoaded } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { data: orgsData } = useUserOrganizations();
   const { data: currentUser } = useCurrentUser();
 
@@ -927,6 +929,17 @@ export function ElectricTestPage() {
     setSelectedIssueId(issue.id);
     setSelectedIssue(issue);
   };
+
+  if (!cloudFeaturesEnabled) {
+    return (
+      <div className="p-double">
+        <h2 className="text-xl font-medium text-high mb-base">
+          Electric SDK Test
+        </h2>
+        <p className="text-low">Cloud sync is disabled.</p>
+      </div>
+    );
+  }
 
   if (!isLoaded) {
     return (

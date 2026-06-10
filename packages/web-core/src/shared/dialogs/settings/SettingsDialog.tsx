@@ -26,6 +26,7 @@ import {
 } from './settings/SettingsHostContext';
 import { SettingsMachineUserSystemProvider } from './settings/SettingsMachineUserSystemProvider';
 import { ConfirmDialog } from '@vibe/ui/components/ConfirmDialog';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 export interface SettingsDialogProps {
   initialSection?: SettingsSectionType;
@@ -57,9 +58,12 @@ function SettingsDialogNavigation({
   const hostSections = SETTINGS_SECTION_DEFINITIONS.filter(
     (section) => section.group === 'host'
   );
-  const universalSections = SETTINGS_SECTION_DEFINITIONS.filter(
-    (section) => section.group === 'universal'
-  );
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+  const universalSections = cloudFeaturesEnabled
+    ? SETTINGS_SECTION_DEFINITIONS.filter(
+        (section) => section.group === 'universal'
+      )
+    : [];
   const hostOptions = availableHosts.map((host) => ({
     value: host.id,
     label: host.status != null ? `${host.label} (${host.status})` : host.label,
@@ -72,6 +76,7 @@ function SettingsDialogNavigation({
       : t('settings.hostPicker.selectMachineHint');
 
   const handlePairOtherMachines = () => {
+    if (!cloudFeaturesEnabled) return;
     onSectionSelect('relay');
   };
 
@@ -121,11 +126,15 @@ function SettingsDialogNavigation({
             value={selectedHostId ?? undefined}
             options={hostOptions}
             actions={[
-              {
-                label: t('settings.layout.nav.pairOtherMachines'),
-                icon: PlusIcon,
-                onClick: handlePairOtherMachines,
-              },
+              ...(cloudFeaturesEnabled
+                ? [
+                    {
+                      label: t('settings.layout.nav.pairOtherMachines'),
+                      icon: PlusIcon,
+                      onClick: handlePairOtherMachines,
+                    },
+                  ]
+                : []),
             ]}
             onChange={setSelectedHostId}
             placeholder={t('settings.layout.nav.selectHost')}
@@ -138,16 +147,20 @@ function SettingsDialogNavigation({
           {hostSections.map((section) => renderSectionButton(section.id))}
         </div>
       </div>
-      <div className="space-y-2">
-        <div className="px-3 pt-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-low">
-            {t('settings.layout.nav.accountSettings')}
+      {universalSections.length > 0 && (
+        <div className="space-y-2">
+          <div className="px-3 pt-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-low">
+              {t('settings.layout.nav.accountSettings')}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            {universalSections.map((section) =>
+              renderSectionButton(section.id)
+            )}
           </div>
         </div>
-        <div className="flex flex-col gap-1">
-          {universalSections.map((section) => renderSectionButton(section.id))}
-        </div>
-      </div>
+      )}
     </nav>
   );
 }
@@ -160,23 +173,35 @@ function SettingsDialogContent({
   const { t } = useTranslation('settings');
   const { isDirty } = useSettingsDirty();
   const { availableHosts, hostsResolved, selectedHost } = useSettingsHost();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+  const visibleSectionDefinitions = useMemo(
+    () =>
+      SETTINGS_SECTION_DEFINITIONS.filter(
+        (section) => cloudFeaturesEnabled || section.group === 'host'
+      ),
+    [cloudFeaturesEnabled]
+  );
 
   const resolvedInitialSection = useMemo<SettingsSectionType>(() => {
     if (
       initialSection &&
-      SETTINGS_SECTION_DEFINITIONS.some(
-        (section) => section.id === initialSection
-      )
+      visibleSectionDefinitions.some((section) => section.id === initialSection)
     ) {
       return initialSection;
     }
 
-    if (hostsResolved && availableHosts.length === 0) {
+    if (cloudFeaturesEnabled && hostsResolved && availableHosts.length === 0) {
       return 'organizations';
     }
 
     return 'general';
-  }, [availableHosts.length, hostsResolved, initialSection]);
+  }, [
+    availableHosts.length,
+    cloudFeaturesEnabled,
+    hostsResolved,
+    initialSection,
+    visibleSectionDefinitions,
+  ]);
 
   const [activeSection, setActiveSection] = useState<SettingsSectionType>(
     resolvedInitialSection
@@ -212,19 +237,38 @@ function SettingsDialogContent({
   }, [isDirty, onClose, t]);
 
   const handleSectionSelect = (sectionId: SettingsSectionType) => {
+    if (
+      !visibleSectionDefinitions.some((section) => section.id === sectionId)
+    ) {
+      return;
+    }
+
     setActiveSection(sectionId);
     setMobileShowContent(true);
   };
 
   useEffect(() => {
     if (
+      !visibleSectionDefinitions.some((section) => section.id === activeSection)
+    ) {
+      setActiveSection('general');
+      return;
+    }
+
+    if (
       hostsResolved &&
       isHostSpecificSettingsSection(activeSection) &&
       availableHosts.length === 0
     ) {
-      setActiveSection('organizations');
+      setActiveSection(cloudFeaturesEnabled ? 'organizations' : 'general');
     }
-  }, [activeSection, availableHosts.length, hostsResolved]);
+  }, [
+    activeSection,
+    availableHosts.length,
+    cloudFeaturesEnabled,
+    hostsResolved,
+    visibleSectionDefinitions,
+  ]);
 
   const handleMobileBack = () => {
     setMobileShowContent(false);

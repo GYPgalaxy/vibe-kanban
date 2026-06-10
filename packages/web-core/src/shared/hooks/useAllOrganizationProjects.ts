@@ -3,6 +3,7 @@ import { createShapeCollection } from '@/shared/lib/electric/collections';
 import { PROJECTS_SHAPE, type Project } from 'shared/remote-types';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
 import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 interface UseAllOrganizationProjectsOptions {
   enabled?: boolean;
@@ -21,6 +22,7 @@ export function useAllOrganizationProjects(
 ) {
   const { enabled = true } = options;
   const { isSignedIn } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { data: orgsData } = useUserOrganizations();
 
   // Stable org IDs list — only recompute when orgsData changes
@@ -33,7 +35,12 @@ export function useAllOrganizationProjects(
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!enabled || !isSignedIn || orgIds.length === 0) {
+    if (
+      !enabled ||
+      !cloudFeaturesEnabled ||
+      !isSignedIn ||
+      orgIds.length === 0
+    ) {
       setProjects([]);
       setIsLoading(false);
       return;
@@ -87,7 +94,7 @@ export function useAllOrganizationProjects(
     return () => {
       subscriptions.forEach((s) => s.unsubscribe());
     };
-  }, [enabled, isSignedIn, orgIds]);
+  }, [cloudFeaturesEnabled, enabled, isSignedIn, orgIds]);
 
   return { data: projects, isLoading };
 }

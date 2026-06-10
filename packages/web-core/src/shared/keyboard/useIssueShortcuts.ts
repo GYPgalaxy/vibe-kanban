@@ -12,6 +12,7 @@ import { isProjectDestination } from '@/shared/lib/routes/appNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import { useIssueSelectionStore } from '@/shared/stores/useIssueSelectionStore';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 const SEQUENCE_TIMEOUT_MS = 1500;
 
@@ -20,8 +21,22 @@ const OPTIONS = {
   sequenceTimeout: SEQUENCE_TIMEOUT_MS,
 } as const;
 
+const CLOUD_ONLY_ISSUE_ACTION_IDS = new Set([
+  'change-issue-status',
+  'change-new-issue-status',
+  'change-issue-priority',
+  'change-new-issue-priority',
+  'change-assignees',
+  'change-new-issue-assignees',
+  'make-sub-issue-of',
+  'add-sub-issue',
+  'remove-parent-issue',
+  'link-workspace',
+]);
+
 export function useIssueShortcuts() {
   const { executeAction } = useActions();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { projectId, issueId } = useParams({ strict: false });
   const destination = useCurrentAppDestination();
   const { isCreateMode: isCreatingIssue } = useCurrentKanbanRouteState();
@@ -42,6 +57,7 @@ export function useIssueShortcuts() {
   const issueIdRef = useRef(issueId);
   const isKanbanRef = useRef(isKanban);
   const isCreatingIssueRef = useRef(isCreatingIssue);
+  const cloudFeaturesEnabledRef = useRef(cloudFeaturesEnabled);
   const multiSelectedIssueIdsRef = useRef(multiSelectedIssueIds);
   const selectAllRef = useRef(selectAll);
   const clearSelectionRef = useRef(clearSelection);
@@ -54,6 +70,7 @@ export function useIssueShortcuts() {
     issueIdRef.current = issueId;
     isKanbanRef.current = isKanban;
     isCreatingIssueRef.current = isCreatingIssue;
+    cloudFeaturesEnabledRef.current = cloudFeaturesEnabled;
     multiSelectedIssueIdsRef.current = multiSelectedIssueIds;
     selectAllRef.current = selectAll;
     clearSelectionRef.current = clearSelection;
@@ -81,6 +98,12 @@ export function useIssueShortcuts() {
   const executeIssueAction = useCallback(
     (action: ActionDefinition, e?: KeyboardEvent) => {
       if (!isKanbanRef.current) return;
+      if (
+        !cloudFeaturesEnabledRef.current &&
+        CLOUD_ONLY_ISSUE_ACTION_IDS.has(action.id)
+      ) {
+        return;
+      }
       // react-hotkeys-hook does not call preventDefault for sequence hotkeys,
       // so we must do it manually to stop the second keystroke from being typed
       // into any focused input (e.g. the title field after i>c opens create mode).

@@ -36,6 +36,7 @@ interface AppBarUserPopoverProps {
   onSignIn: () => void;
   onLogout: () => void;
   onAvatarError: () => void;
+  showAuthActions?: boolean;
 }
 
 export function AppBarUserPopover({
@@ -52,6 +53,7 @@ export function AppBarUserPopover({
   onSignIn,
   onLogout,
   onAvatarError,
+  showAuthActions = true,
 }: AppBarUserPopoverProps) {
   const { t } = useTranslation();
   const settingsLabel = t('settings:settings.layout.nav.title', {
@@ -71,18 +73,24 @@ export function AppBarUserPopover({
               'hover:bg-panel/70',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand'
             )}
-            aria-label="Sign in"
+            aria-label={showAuthActions ? 'Sign in' : settingsLabel}
           >
-            <UserIcon className="size-icon-sm" weight="bold" />
+            {showAuthActions ? (
+              <UserIcon className="size-icon-sm" weight="bold" />
+            ) : (
+              <GearIcon className="size-icon-sm" weight="bold" />
+            )}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" className="min-w-[200px]">
-          <DropdownMenuItem icon={SignInIcon} onClick={onSignIn}>
-            {t('signIn')}
-          </DropdownMenuItem>
+          {showAuthActions && (
+            <DropdownMenuItem icon={SignInIcon} onClick={onSignIn}>
+              {t('signIn')}
+            </DropdownMenuItem>
+          )}
           {onSettings && (
             <>
-              <DropdownMenuSeparator />
+              {showAuthActions && <DropdownMenuSeparator />}
               <DropdownMenuItem icon={GearIcon} onClick={onSettings}>
                 {settingsLabel}
               </DropdownMenuItem>

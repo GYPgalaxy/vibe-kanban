@@ -4,11 +4,14 @@ import { getFirstProjectDestination } from '@/shared/lib/firstProjectDestination
 import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
 import { useUiPreferencesStore } from '@/shared/stores/useUiPreferencesStore';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
+import { localProjectsApi } from '@/shared/lib/api';
 
 export function RootRedirectPage() {
   const { config, loading, loginStatus } = useUserSystem();
   const setSelectedOrgId = useOrganizationStore((s) => s.setSelectedOrgId);
   const appNavigation = useAppNavigation();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
 
   useEffect(() => {
     if (loading || !config) {
@@ -17,6 +20,28 @@ export function RootRedirectPage() {
 
     let isActive = true;
     void (async () => {
+      if (!cloudFeaturesEnabled) {
+        let firstProjectId: string | null = null;
+        try {
+          const projects = await localProjectsApi.list();
+          firstProjectId = projects[0]?.id ?? null;
+        } catch (error) {
+          console.error('Failed to load local projects:', error);
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        if (firstProjectId) {
+          appNavigation.goToProject(firstProjectId, { replace: true });
+          return;
+        }
+
+        appNavigation.goToWorkspaces({ replace: true });
+        return;
+      }
+
       if (!config.remote_onboarding_acknowledged) {
         appNavigation.goToOnboarding({ replace: true });
         return;
@@ -52,7 +77,14 @@ export function RootRedirectPage() {
     return () => {
       isActive = false;
     };
-  }, [appNavigation, config, loading, loginStatus?.status, setSelectedOrgId]);
+  }, [
+    appNavigation,
+    cloudFeaturesEnabled,
+    config,
+    loading,
+    loginStatus?.status,
+    setSelectedOrgId,
+  ]);
 
   return (
     <div className="h-screen bg-primary flex items-center justify-center">

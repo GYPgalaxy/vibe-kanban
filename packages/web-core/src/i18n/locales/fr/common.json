@@ -216,7 +216,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "Bienvenue",
-      "content": "Bienvenue dans les Espaces de travail, une interface repensée pour Vibe Kanban. Nous la déployons auprès d'utilisateurs sélectionnés pour recueillir leurs premiers retours. Partagez vos impressions à tout moment en utilisant l'icône de feedback dans la barre de navigation."
+      "content": "Bienvenue dans les Espaces de travail, une interface repensée pour Vibe Kanban."
     },
     "commandBar": {
       "title": "Barre de commandes",
@@ -460,7 +460,7 @@
     "projectsGuide": {
       "intro": {
         "title": "Welcome",
-        "content": "Welcome to Vibe Kanban. Use the help sections in this panel to learn how things work, then create your first issue. You can re-open this help dialog or give feedback anytime from the navbar."
+        "content": "Welcome to Vibe Kanban. Use the help sections in this panel to learn how things work, then create your first issue. You can re-open this help dialog anytime from the navbar."
       },
       "welcome": {
         "title": "Projects",

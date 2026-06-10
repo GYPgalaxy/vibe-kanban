@@ -27,6 +27,7 @@ import {
   ProjectContext,
   type ProjectContextValue,
 } from '@/shared/hooks/useProjectContext';
+import { bulkUpdateIssues as bulkUpdateRemoteIssues } from '@/shared/lib/remoteApi';
 
 interface ProjectProviderProps {
   projectId: string;
@@ -249,6 +250,9 @@ export function ProjectProvider({ projectId, children }: ProjectProviderProps) {
       insertIssue: issuesResult.insert,
       updateIssue: issuesResult.update,
       removeIssue: issuesResult.remove,
+      bulkUpdateIssues: (updates) => ({
+        persisted: bulkUpdateRemoteIssues(updates),
+      }),
 
       // Status mutations
       insertStatus: statusesResult.insert,

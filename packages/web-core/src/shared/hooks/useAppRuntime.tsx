@@ -31,3 +31,15 @@ export function useAppRuntime(): AppRuntime {
 
   return runtime;
 }
+
+export function isCloudFeaturesEnabledForRuntime(runtime: AppRuntime): boolean {
+  if (runtime === 'remote') {
+    return true;
+  }
+
+  return import.meta.env.VITE_ENABLE_CLOUD_FEATURES === 'true';
+}
+
+export function useCloudFeaturesEnabled(): boolean {
+  return isCloudFeaturesEnabledForRuntime(useAppRuntime());
+}

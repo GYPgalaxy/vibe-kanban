@@ -15,6 +15,7 @@ import { useShape } from '@/shared/integrations/electric/hooks';
 import { useExecutionProcessesContext } from '@/shared/hooks/useExecutionProcessesContext';
 import { useLogsPanel } from '@/shared/hooks/useLogsPanel';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { isProjectDestination } from '@/shared/lib/routes/appNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
@@ -46,6 +47,7 @@ export function useActionVisibilityContext(
   const diffPathsSet = useDiffPaths();
   const diffViewMode = useDiffViewMode();
   const expanded = useUiPreferencesStore((s) => s.expanded);
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
 
   // Derive kanban state from URL (URL is single source of truth)
   const { projectId: routeProjectId, issueId: routeIssueId } = useParams({
@@ -71,7 +73,7 @@ export function useActionVisibilityContext(
     PROJECT_ISSUES_SHAPE,
     projectIssuesParams,
     {
-      enabled: shouldResolveSelectedIssueParent,
+      enabled: cloudFeaturesEnabled && shouldResolveSelectedIssueParent,
     }
   );
   const hasSelectedKanbanIssueParent = useMemo(() => {
@@ -147,7 +149,8 @@ export function useActionVisibilityContext(
       hasSelectedKanbanIssue,
       hasSelectedKanbanIssueParent,
       isCreatingIssue: kanbanCreateMode,
-      isSignedIn,
+      cloudFeaturesEnabled,
+      isSignedIn: cloudFeaturesEnabled && isSignedIn,
     };
   }, [
     layoutMode,
@@ -171,6 +174,7 @@ export function useActionVisibilityContext(
     hasSelectedKanbanIssue,
     hasSelectedKanbanIssueParent,
     kanbanCreateMode,
+    cloudFeaturesEnabled,
     isSignedIn,
   ]);
 }

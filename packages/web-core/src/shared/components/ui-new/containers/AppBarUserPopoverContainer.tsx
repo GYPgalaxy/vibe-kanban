@@ -7,6 +7,7 @@ import { useUserSystem } from '@/shared/hooks/useUserSystem';
 import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
 import { useActions } from '@/shared/hooks/useActions';
 import { Actions } from '@/shared/actions';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 interface AppBarUserPopoverContainerProps {
   organizations: OrganizationWithRole[];
@@ -21,6 +22,7 @@ export function AppBarUserPopoverContainer({
 }: AppBarUserPopoverContainerProps) {
   const { executeAction } = useActions();
   const { isSignedIn } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { loginStatus } = useUserSystem();
   const setSelectedOrgId = useOrganizationStore((s) => s.setSelectedOrgId);
   const [open, setOpen] = useState(false);
@@ -52,10 +54,10 @@ export function AppBarUserPopoverContainer({
 
   return (
     <AppBarUserPopover
-      isSignedIn={isSignedIn}
+      isSignedIn={cloudFeaturesEnabled && isSignedIn}
       avatarUrl={avatarUrl}
       avatarError={avatarError}
-      organizations={organizations}
+      organizations={cloudFeaturesEnabled ? organizations : []}
       selectedOrgId={selectedOrgId}
       open={open}
       onOpenChange={setOpen}
@@ -65,6 +67,7 @@ export function AppBarUserPopoverContainer({
       onLogout={handleLogout}
       onAvatarError={() => setAvatarError(true)}
       onSettings={handleSettings}
+      showAuthActions={cloudFeaturesEnabled}
     />
   );
 }

@@ -20,6 +20,7 @@ pub mod host_relay;
 pub mod oauth;
 pub mod organizations;
 pub mod preview;
+pub mod projects;
 pub mod relay_auth;
 pub mod releases;
 pub mod remote;
@@ -43,6 +44,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(tags::router(&deployment))
         .merge(oauth::router())
         .merge(organizations::router())
+        .merge(projects::router())
         .merge(filesystem::router())
         .merge(repo::router())
         .merge(events::router(&deployment))

@@ -8,6 +8,20 @@ export type Repo = { id: string, path: string, name: string, display_name: strin
 
 export type Project = { id: string, name: string, default_agent_working_dir: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, };
 
+export type CreateProject = { id: string | null, name: string, };
+
+export type UpdateProject = { name: string | null, };
+
+export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, sort_order: number, created_at: string, updated_at: string, };
+
+export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelled";
+
+export type CreateTask = { id: string | null, title: string, description: string | null, status: TaskStatus | null, parent_workspace_id: string | null, sort_order: number | null, };
+
+export type UpdateTask = { title: string | null, description: string | null | null, status: TaskStatus | null, parent_workspace_id: string | null | null, sort_order: number | null, };
+
+export type BulkUpdateTaskItem = { id: string, changes: UpdateTask, };
+
 export type UpdateRepo = { display_name?: string | null, setup_script?: string | null, cleanup_script?: string | null, archive_script?: string | null, copy_files?: string | null, parallel_setup_script?: boolean | null, dev_server_script?: string | null, default_target_branch?: string | null, default_working_dir?: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, 
@@ -261,6 +275,10 @@ export type UpdateMemberRoleResponse = { user_id: string, role: MemberRole, };
 export type RegisterRepoRequest = { path: string, display_name: string | null, };
 
 export type InitRepoRequest = { parent_path: string, folder_name: string, };
+
+export type BulkUpdateTasksRequest = { updates: Array<BulkUpdateTaskItem>, };
+
+export type BulkUpdateTasksResponse = { tasks: Array<Task>, };
 
 export type TagSearchParams = { search: string | null, };
 

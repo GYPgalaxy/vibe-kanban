@@ -6,11 +6,13 @@ import {
 } from 'shared/remote-types';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
 import { groupNotifications } from '@/shared/lib/notifications';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 export function useNotifications() {
   const { isSignedIn, userId } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
 
-  const enabled = isSignedIn && !!userId;
+  const enabled = cloudFeaturesEnabled && isSignedIn && !!userId;
 
   const result = useShape(
     NOTIFICATIONS_SHAPE,

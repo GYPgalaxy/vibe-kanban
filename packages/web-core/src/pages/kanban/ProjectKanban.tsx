@@ -19,6 +19,7 @@ import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
 import { useOrganizationProjects } from '@/shared/hooks/useOrganizationProjects';
 import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import {
@@ -29,7 +30,11 @@ import {
  * Component that registers project mutations with ActionsContext.
  * Must be rendered inside both ActionsProvider and ProjectProvider.
  */
-function ProjectMutationsRegistration({ children }: { children: ReactNode }) {
+export function ProjectMutationsRegistration({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const { registerProjectMutations } = useActions();
   const { removeIssue, insertIssue, getIssue, getAssigneesForIssue, issues } =
     useProjectContext();
@@ -102,7 +107,7 @@ function ProjectKanbanBoard() {
   );
 }
 
-function ProjectKanbanLayout({ projectName }: { projectName: string }) {
+export function ProjectKanbanLayout({ projectName }: { projectName: string }) {
   const { issueId, isPanelOpen } = useCurrentKanbanRouteState();
   const isMobile = useIsMobile();
   const { getIssue } = useProjectContext();
@@ -259,6 +264,7 @@ export function ProjectKanban() {
   const appNavigation = useAppNavigation();
   const { t } = useTranslation('common');
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const issueComposerKey = useMemo(() => {
     if (!projectId) {
       return null;
@@ -266,6 +272,12 @@ export function ProjectKanban() {
     return buildKanbanIssueComposerKey(hostId, projectId);
   }, [hostId, projectId]);
   const previousIssueComposerKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!cloudFeaturesEnabled) {
+      appNavigation.goToWorkspaces({ replace: true });
+    }
+  }, [appNavigation, cloudFeaturesEnabled]);
 
   useEffect(() => {
     const previousKey = previousIssueComposerKeyRef.current;
@@ -291,6 +303,14 @@ export function ProjectKanban() {
   const { organizationId, isLoading } = useFindProjectById(
     projectId ?? undefined
   );
+
+  if (!cloudFeaturesEnabled) {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <p className="text-low">{t('states.loading')}</p>
+      </div>
+    );
+  }
 
   // Show loading while auth state is being determined
   if (!authLoaded || isLoading) {

@@ -147,6 +147,7 @@ export interface ActionVisibilityContext {
   isCreatingIssue: boolean;
 
   // Auth state
+  cloudFeaturesEnabled: boolean;
   isSignedIn: boolean;
 }
 

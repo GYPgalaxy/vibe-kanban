@@ -68,6 +68,9 @@ export interface ProjectContextValue {
     changes: Partial<UpdateIssueRequest>
   ) => MutationResult;
   removeIssue: (id: string) => MutationResult;
+  bulkUpdateIssues: (
+    updates: { id: string; changes: Partial<UpdateIssueRequest> }[]
+  ) => MutationResult;
 
   // Status mutations
   insertStatus: (

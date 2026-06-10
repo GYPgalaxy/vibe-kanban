@@ -12,6 +12,8 @@ import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
 import { useOrganizationProjects } from '@/shared/hooks/useOrganizationProjects';
 import { makeRequest as makeRemoteRequest } from '@/shared/lib/remoteApi';
 import { LoginRequiredPrompt } from '@/shared/dialogs/shared/LoginRequiredPrompt';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
+import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 
 function resolveTheme(theme: ThemeMode): 'light' | 'dark' {
   if (theme === ThemeMode.SYSTEM) {
@@ -82,6 +84,8 @@ export function ExportPage({
 
 export function ExportPageContainer() {
   const { isLoaded, isSignedIn } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+  const appNavigation = useAppNavigation();
   const { data: orgsData, isLoading: orgsLoading } = useUserOrganizations();
   const organizations = useMemo<ExportOrganization[]>(
     () =>
@@ -125,6 +129,20 @@ export function ExportPageContainer() {
       body: JSON.stringify(request),
     });
   }, []);
+
+  useEffect(() => {
+    if (!cloudFeaturesEnabled) {
+      appNavigation.goToWorkspaces({ replace: true });
+    }
+  }, [appNavigation, cloudFeaturesEnabled]);
+
+  if (!cloudFeaturesEnabled) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-primary">
+        <p className="text-sm text-low">Loading...</p>
+      </div>
+    );
+  }
 
   if (!isLoaded) {
     return (

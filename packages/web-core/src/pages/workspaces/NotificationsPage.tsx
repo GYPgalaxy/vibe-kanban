@@ -11,6 +11,7 @@ import {
 } from '@/shared/lib/notificationMessage';
 import { formatRelativeTime } from '@/shared/lib/date';
 import { cn } from '@/shared/lib/utils';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 function NotificationMessage({
   segments,
@@ -58,6 +59,7 @@ function NotificationMessage({
 
 export function NotificationsPage() {
   const router = useRouter();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { data, updateMany, enabled, unseenCount, groupedNotifications } =
     useNotifications();
   const { membersByUserId } = useNotificationMembers(data);
@@ -94,6 +96,14 @@ export function NotificationsPage() {
     if (unseen.length === 0) return;
     updateMany(unseen.map((n) => ({ id: n.id, changes: { seen: true } })));
   }, [data, updateMany]);
+
+  if (!cloudFeaturesEnabled) {
+    return (
+      <div className="flex items-center justify-center h-full text-low">
+        Cloud notifications are disabled.
+      </div>
+    );
+  }
 
   if (!enabled) {
     return (

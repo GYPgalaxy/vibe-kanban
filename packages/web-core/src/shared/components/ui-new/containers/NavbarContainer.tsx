@@ -39,6 +39,7 @@ import { getProjectDestination } from '@/shared/lib/routes/appNavigation';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
 import { getRemoteAuthDegradedMessage } from '@/shared/lib/auth/remoteAuthDegraded';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 /**
  * Check if a NavbarItem is a divider
@@ -128,6 +129,7 @@ export function NavbarContainer({
   const { workspaces } = useUserContext();
   const syncErrorContext = useSyncErrorContext();
   const { remoteAuthDegraded } = useUserSystem();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const appNavigation = useAppNavigation();
   const destination = useCurrentAppDestination();
   const projectDestination = useMemo(
@@ -199,7 +201,10 @@ export function NavbarContainer({
   const linkedProjectId = linkedRemoteWorkspace?.project_id ?? null;
   const linkedIssueId = linkedRemoteWorkspace?.issue_id ?? null;
   const shouldResolveBreadcrumbData =
-    !isOnProjectPage && !isCreateMode && !!linkedProjectId;
+    cloudFeaturesEnabled &&
+    !isOnProjectPage &&
+    !isCreateMode &&
+    !!linkedProjectId;
   const shouldResolveIssueBreadcrumb =
     shouldResolveBreadcrumbData && !!linkedIssueId;
 
@@ -210,7 +215,7 @@ export function NavbarContainer({
   const { data: projectIssues, isLoading: isProjectIssuesLoading } = useShape(
     PROJECT_ISSUES_SHAPE,
     { project_id: linkedProjectId || '' },
-    { enabled: shouldResolveIssueBreadcrumb }
+    { enabled: cloudFeaturesEnabled && shouldResolveIssueBreadcrumb }
   );
   const linkedProject = allProjects.find((p) => p.id === linkedProjectId);
   const isWaitingForProjectBreadcrumb =
@@ -300,7 +305,9 @@ export function NavbarContainer({
     if (!mobileMode) return undefined;
     return (
       <AppBarUserPopoverContainer
-        organizations={orgsData?.organizations ?? []}
+        organizations={
+          cloudFeaturesEnabled ? (orgsData?.organizations ?? []) : []
+        }
         selectedOrgId={selectedOrgId ?? ''}
         onOrgSelect={onOrgSelect ?? (() => {})}
       />
@@ -310,7 +317,7 @@ export function NavbarContainer({
   const syncErrors = useMemo(() => {
     const errors = syncErrorContext?.errors ? [...syncErrorContext.errors] : [];
 
-    if (remoteAuthDegraded) {
+    if (cloudFeaturesEnabled && remoteAuthDegraded) {
       errors.push({
         streamId: 'remote-auth-degraded',
         tableName: 'Remote authentication',
@@ -322,7 +329,7 @@ export function NavbarContainer({
     }
 
     return errors;
-  }, [remoteAuthDegraded, syncErrorContext?.errors, t]);
+  }, [cloudFeaturesEnabled, remoteAuthDegraded, syncErrorContext?.errors, t]);
 
   return (
     <Navbar
@@ -345,6 +352,7 @@ export function NavbarContainer({
       leftSlot={
         !breadcrumbs &&
         !isWaitingForBreadcrumbData &&
+        cloudFeaturesEnabled &&
         linkedRemoteWorkspace?.issue_id ? (
           <RemoteIssueLink
             projectId={linkedRemoteWorkspace.project_id}

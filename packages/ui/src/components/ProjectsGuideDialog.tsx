@@ -34,7 +34,7 @@ const ProjectsGuideDialogImpl = NiceModal.create<NoProps>(() => {
       title: t('kanban.projectsGuide.intro.title', 'Welcome'),
       content: t(
         'kanban.projectsGuide.intro.content',
-        'Welcome to Vibe Kanban. Use the help sections in this panel to learn how things work, then create your first issue. You can re-open this help dialog or give feedback anytime from the navbar.'
+        'Welcome to Vibe Kanban. Use the help sections in this panel to learn how things work, then create your first issue. You can re-open this help dialog anytime from the navbar.'
       ),
       imageSrc: '/guide-images/welcome.png',
     },

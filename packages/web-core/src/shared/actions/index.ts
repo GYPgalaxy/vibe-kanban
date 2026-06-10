@@ -35,7 +35,6 @@ import {
   ArrowUpIcon,
   HighlighterIcon,
   ListIcon,
-  MegaphoneIcon,
   QuestionIcon,
   ArrowsLeftRightIcon,
   ArrowFatLineUpIcon,
@@ -69,7 +68,6 @@ import { CreatePRDialog } from '@/shared/dialogs/command-bar/CreatePRDialog';
 import { getIdeName } from '@/shared/lib/ideName';
 import { EditorSelectionDialog } from '@/shared/dialogs/command-bar/EditorSelectionDialog';
 import { StartReviewDialog } from '@/shared/dialogs/command-bar/StartReviewDialog';
-import posthog from 'posthog-js';
 import { WorkspacesGuideDialog } from '@/shared/dialogs/shared/WorkspacesGuideDialog';
 import { SettingsDialog } from '@/shared/dialogs/settings/SettingsDialog';
 import { CreateWorkspaceFromPrDialog } from '@/shared/dialogs/command-bar/CreateWorkspaceFromPrDialog';
@@ -428,7 +426,7 @@ export const Actions = {
     label: 'Project Settings',
     icon: GearIcon,
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => ctx.layoutMode === 'kanban',
+    isVisible: (ctx) => ctx.cloudFeaturesEnabled && ctx.layoutMode === 'kanban',
     execute: async (ctx) => {
       await SettingsDialog.show({
         initialSection: 'remote-projects',
@@ -445,7 +443,7 @@ export const Actions = {
     label: 'Sign In',
     icon: SignInIcon,
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => !ctx.isSignedIn,
+    isVisible: (ctx) => ctx.cloudFeaturesEnabled && !ctx.isSignedIn,
     execute: async () => {
       const { OAuthDialog } = await import(
         '@/shared/dialogs/global/OAuthDialog'
@@ -459,7 +457,7 @@ export const Actions = {
     label: 'Sign Out',
     icon: SignOutIcon,
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => ctx.isSignedIn,
+    isVisible: (ctx) => ctx.cloudFeaturesEnabled && ctx.isSignedIn,
     execute: async (ctx) => {
       const { oauthApi } = await import('@/shared/lib/api');
       const { useOrganizationStore } = await import(
@@ -477,16 +475,6 @@ export const Actions = {
       ctx.appNavigation.goToWorkspaces();
     },
   } satisfies GlobalActionDefinition,
-
-  Feedback: {
-    id: 'feedback',
-    label: 'Give Feedback',
-    icon: MegaphoneIcon,
-    requiresTarget: ActionTargetType.NONE,
-    execute: () => {
-      posthog.displaySurvey('019bb6e8-3d36-0000-1806-7330cd3c727e');
-    },
-  },
 
   WorkspacesGuide: {
     id: 'workspaces-guide',
@@ -1238,7 +1226,9 @@ export const Actions = {
     shortcut: 'I S',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       await ctx.openStatusSelection(projectId, issueIds);
     },
@@ -1250,7 +1240,10 @@ export const Actions = {
     icon: ArrowsLeftRightIcon,
     shortcut: 'I S',
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => ctx.layoutMode === 'kanban' && ctx.isCreatingIssue,
+    isVisible: (ctx) =>
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.isCreatingIssue,
     execute: async (ctx) => {
       if (!ctx.kanbanProjectId) return;
       const { ProjectSelectionDialog } = await import(
@@ -1270,7 +1263,9 @@ export const Actions = {
     shortcut: 'I P',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       await ctx.openPrioritySelection(projectId, issueIds);
     },
@@ -1282,7 +1277,10 @@ export const Actions = {
     icon: ArrowFatLineUpIcon,
     shortcut: 'I P',
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => ctx.layoutMode === 'kanban' && ctx.isCreatingIssue,
+    isVisible: (ctx) =>
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.isCreatingIssue,
     execute: async (ctx) => {
       if (!ctx.kanbanProjectId) return;
       const { ProjectSelectionDialog } = await import(
@@ -1302,7 +1300,9 @@ export const Actions = {
     shortcut: 'I A',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       await ctx.openAssigneeSelection(projectId, issueIds, false);
     },
@@ -1314,7 +1314,10 @@ export const Actions = {
     icon: UsersIcon,
     shortcut: 'I A',
     requiresTarget: ActionTargetType.NONE,
-    isVisible: (ctx) => ctx.layoutMode === 'kanban' && ctx.isCreatingIssue,
+    isVisible: (ctx) =>
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.isCreatingIssue,
     execute: async (ctx) => {
       // Opens assignee selection for the issue being created
       // ProjectId will be resolved from route params inside the dialog
@@ -1329,7 +1332,9 @@ export const Actions = {
     shortcut: 'I M',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openSubIssueSelection(projectId, issueIds[0], 'setParent');
@@ -1344,7 +1349,9 @@ export const Actions = {
     shortcut: 'I B',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length !== 1) return;
       const parentIssueId = issueIds[0];
@@ -1365,7 +1372,9 @@ export const Actions = {
     icon: PlusIcon,
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, _projectId, issueIds) => {
       if (issueIds.length !== 1) return;
       navigateToCreateSubIssue(ctx, issueIds[0]);
@@ -1380,6 +1389,7 @@ export const Actions = {
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
       ctx.layoutMode === 'kanban' &&
+      ctx.cloudFeaturesEnabled &&
       ctx.hasSelectedKanbanIssue &&
       ctx.hasSelectedKanbanIssueParent,
     execute: async (_ctx, _projectId, issueIds) => {
@@ -1402,7 +1412,9 @@ export const Actions = {
     shortcut: 'I W',
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openWorkspaceSelection(projectId, issueIds[0]);
@@ -1461,7 +1473,9 @@ export const Actions = {
     icon: ArrowBendUpRightIcon,
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openRelationshipSelection(
@@ -1480,7 +1494,9 @@ export const Actions = {
     icon: ProhibitIcon,
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openRelationshipSelection(
@@ -1499,7 +1515,9 @@ export const Actions = {
     icon: ArrowsLeftRightIcon,
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openRelationshipSelection(
@@ -1518,7 +1536,9 @@ export const Actions = {
     icon: CopyIcon,
     requiresTarget: ActionTargetType.ISSUE,
     isVisible: (ctx) =>
-      ctx.layoutMode === 'kanban' && ctx.hasSelectedKanbanIssue,
+      ctx.cloudFeaturesEnabled &&
+      ctx.layoutMode === 'kanban' &&
+      ctx.hasSelectedKanbanIssue,
     execute: async (ctx, projectId, issueIds) => {
       if (issueIds.length === 1) {
         await ctx.openRelationshipSelection(
@@ -1547,7 +1567,6 @@ export const NavbarActionGroups = {
     Actions.ToggleRightSidebar,
     NavbarDivider,
     Actions.OpenCommandBar,
-    Actions.Feedback,
     Actions.WorkspacesGuide,
     Actions.ProjectsGuide,
     Actions.Settings,

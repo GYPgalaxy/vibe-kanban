@@ -5,6 +5,7 @@ import type { PairRelayHostRequest, RelayPairedHost } from 'shared/types';
 import type { RelayHost } from 'shared/remote-types';
 import { relayApi } from '@/shared/lib/api';
 import { listRelayHosts } from '@/shared/lib/remoteApi';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 export type RemoteCloudHostStatus = AppBarHostStatus;
 
@@ -72,9 +73,12 @@ async function fetchRemoteCloudHostsState(): Promise<RemoteCloudHostsState> {
 }
 
 export function useRemoteCloudHostsState() {
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+
   return useQuery({
     queryKey: REMOTE_CLOUD_HOSTS_STATE_QUERY_KEY,
     queryFn: fetchRemoteCloudHostsState,
+    enabled: cloudFeaturesEnabled,
     staleTime: 0,
   });
 }
@@ -110,9 +114,10 @@ export function useRemoteCloudHostsAppBarModel(): {
   hosts: AppBarHost[];
   remoteHosts: RemoteCloudHost[];
 } {
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { data } = useRemoteCloudHostsState();
 
-  const remoteHosts = data?.hosts ?? [];
+  const remoteHosts = cloudFeaturesEnabled ? (data?.hosts ?? []) : [];
 
   const hosts = useMemo<AppBarHost[]>(
     () =>

@@ -7,7 +7,6 @@ import { useOrgContext } from '@/shared/hooks/useOrgContext';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useActions } from '@/shared/hooks/useActions';
 import { Actions } from '@/shared/actions';
-import { bulkUpdateIssues } from '@/shared/lib/remoteApi';
 import { ConfirmDialog } from '@vibe/ui/components/ConfirmDialog';
 import {
   IssueSubIssuesSection,
@@ -41,6 +40,7 @@ export function IssueSubIssuesSectionContainer({
     statuses,
     updateIssue,
     removeIssue,
+    bulkUpdateIssues,
     getAssigneesForIssue,
     isLoading: projectLoading,
   } = useProjectContext();
@@ -130,7 +130,7 @@ export function IssueSubIssuesSectionContainer({
       // Show loading overlay while saving
       setIsReordering(true);
       bulkUpdateIssues(updates)
-        .catch((err) => {
+        .persisted.catch((err) => {
           console.error('Failed to update sort order:', err);
         })
         .finally(() => {
@@ -138,7 +138,7 @@ export function IssueSubIssuesSectionContainer({
           setTimeout(() => setIsReordering(false), 500);
         });
     },
-    [subIssues]
+    [subIssues, bulkUpdateIssues]
   );
 
   const isLoading = projectLoading || orgLoading;

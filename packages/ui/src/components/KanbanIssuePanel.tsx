@@ -148,6 +148,7 @@ export interface KanbanIssuePanelProps {
   isUploading?: boolean;
   attachmentError?: string | null;
   onDismissAttachmentError?: () => void;
+  showCreateDraftWorkspaceToggle?: boolean;
 
   // Edit-mode section renderers
   renderWorkspacesSection?: (issueId: string) => ReactNode;
@@ -190,6 +191,7 @@ export function KanbanIssuePanel({
   isUploading,
   attachmentError,
   onDismissAttachmentError,
+  showCreateDraftWorkspaceToggle = true,
   renderWorkspacesSection,
   renderRelationshipsSection,
   renderSubIssuesSection,
@@ -486,7 +488,7 @@ export function KanbanIssuePanel({
         </div>
 
         {/* Create Draft Workspace Toggle (Create mode only) */}
-        {isCreateMode && (
+        {isCreateMode && showCreateDraftWorkspaceToggle && (
           <div className="p-base border-t">
             <Toggle
               checked={formData.createDraftWorkspace}

@@ -13,6 +13,7 @@ import { useWorkspaceContext } from '@/shared/hooks/useWorkspaceContext';
 import { useActions } from '@/shared/hooks/useActions';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { cn } from '@/shared/lib/utils';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
@@ -28,10 +29,6 @@ import {
   useKanbanFilters,
   PRIORITY_ORDER,
 } from '../model/hooks/useKanbanFilters';
-import {
-  bulkUpdateIssues,
-  type BulkUpdateIssueItem,
-} from '@/shared/lib/remoteApi';
 import { PlusIcon, DotsThreeIcon } from '@phosphor-icons/react';
 import { Actions } from '@/shared/actions';
 import {
@@ -127,6 +124,7 @@ export function KanbanContainer() {
   const { t } = useTranslation('common');
   const appNavigation = useAppNavigation();
   const routeState = useCurrentKanbanRouteState();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
 
   // Get data from contexts (set up by WorkspacesLayout)
   const {
@@ -146,6 +144,7 @@ export function KanbanContainer() {
     insertIssueTag,
     removeIssueTag,
     insertTag,
+    bulkUpdateIssues,
     pullRequests,
     isLoading: projectLoading,
   } = useProjectContext();
@@ -706,7 +705,7 @@ export function KanbanContainer() {
       });
 
       // Build bulk updates for all issues in affected columns
-      const updates: BulkUpdateIssueItem[] = [];
+      const updates: Parameters<typeof bulkUpdateIssues>[0] = [];
 
       // Always update destination column
       const destIssueIds = newItems[destId] ?? [];
@@ -736,7 +735,7 @@ export function KanbanContainer() {
       // Perform bulk update
       isSyncingRef.current = true;
       bulkUpdateIssues(updates)
-        .catch((err) => {
+        .persisted.catch((err) => {
           console.error('Failed to bulk update sort order:', err);
         })
         .finally(() => {
@@ -746,7 +745,7 @@ export function KanbanContainer() {
           }, 500);
         });
     },
-    [kanbanFilters.sortField, calculateSortOrder]
+    [kanbanFilters.sortField, calculateSortOrder, bulkUpdateIssues]
   );
 
   // Multi-select support
@@ -920,11 +919,13 @@ export function KanbanContainer() {
               <DropdownMenuItem onClick={openProjectsGuide}>
                 {t('kanban.openProjectsGuide', 'Projects guide')}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => executeAction(Actions.ProjectSettings)}
-              >
-                {t('kanban.editProjectSettings', 'Edit project settings')}
-              </DropdownMenuItem>
+              {cloudFeaturesEnabled && (
+                <DropdownMenuItem
+                  onClick={() => executeAction(Actions.ProjectSettings)}
+                >
+                  {t('kanban.editProjectSettings', 'Edit project settings')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1055,43 +1056,55 @@ export function KanbanContainer() {
                               )}
                               isSubIssue={!!issue.parent_issue_id}
                               isMobile={isMobile}
-                              onPriorityClick={(e) => {
-                                e.stopPropagation();
-                                handleCardPriorityClick(issue.id);
-                              }}
-                              onAssigneeClick={(e) => {
-                                e.stopPropagation();
-                                handleCardAssigneeClick(issue.id);
-                              }}
+                              onPriorityClick={
+                                cloudFeaturesEnabled
+                                  ? (e) => {
+                                      e.stopPropagation();
+                                      handleCardPriorityClick(issue.id);
+                                    }
+                                  : undefined
+                              }
+                              onAssigneeClick={
+                                cloudFeaturesEnabled
+                                  ? (e) => {
+                                      e.stopPropagation();
+                                      handleCardAssigneeClick(issue.id);
+                                    }
+                                  : undefined
+                              }
                               onMoreActionsClick={() =>
                                 handleCardMoreActionsClick(issue.id)
                               }
-                              tagEditProps={{
-                                allTags: tags,
-                                selectedTagIds: getTagsForIssue(issue.id).map(
-                                  (it) => it.tag_id
-                                ),
-                                onTagToggle: (tagId) =>
-                                  handleCardTagToggle(issue.id, tagId),
-                                onCreateTag: handleCreateTag,
-                                renderTagEditor: ({
-                                  allTags,
-                                  selectedTagIds,
-                                  onTagToggle,
-                                  onCreateTag,
-                                  trigger,
-                                }) => (
-                                  <SearchableTagDropdownContainer
-                                    tags={allTags}
-                                    selectedTagIds={selectedTagIds}
-                                    onTagToggle={onTagToggle}
-                                    onCreateTag={onCreateTag}
-                                    disabled={false}
-                                    contentClassName=""
-                                    trigger={trigger}
-                                  />
-                                ),
-                              }}
+                              tagEditProps={
+                                cloudFeaturesEnabled
+                                  ? {
+                                      allTags: tags,
+                                      selectedTagIds: getTagsForIssue(
+                                        issue.id
+                                      ).map((it) => it.tag_id),
+                                      onTagToggle: (tagId) =>
+                                        handleCardTagToggle(issue.id, tagId),
+                                      onCreateTag: handleCreateTag,
+                                      renderTagEditor: ({
+                                        allTags,
+                                        selectedTagIds,
+                                        onTagToggle,
+                                        onCreateTag,
+                                        trigger,
+                                      }) => (
+                                        <SearchableTagDropdownContainer
+                                          tags={allTags}
+                                          selectedTagIds={selectedTagIds}
+                                          onTagToggle={onTagToggle}
+                                          onCreateTag={onCreateTag}
+                                          disabled={false}
+                                          contentClassName=""
+                                          trigger={trigger}
+                                        />
+                                      ),
+                                    }
+                                  : undefined
+                              }
                             />
                             {issueWorkspaces.length > 0 && (
                               <div className="mt-base flex flex-col gap-half">

@@ -54,6 +54,7 @@ import {
 } from '@/shared/lib/attachmentUtils';
 import { ConfirmDialog } from '@vibe/ui/components/ConfirmDialog';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import {
   buildKanbanIssueComposerKey,
@@ -80,6 +81,7 @@ export function KanbanIssuePanelContainer({
 }: KanbanIssuePanelContainerProps) {
   const { t } = useTranslation('common');
   const appNavigation = useAppNavigation();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const routeState = useCurrentKanbanRouteState();
 
   const { openWorkspaceCreateFromState } = useProjectWorkspaceCreateDraft();
@@ -255,6 +257,22 @@ export function KanbanIssuePanelContainer({
   // Default status: use kanbanCreateDefaultStatusId if set, otherwise first by sort order
   const defaultStatusId =
     kanbanCreateDefaultStatusId ?? sortedStatuses[0]?.id ?? '';
+  const getNextStatusId = useCallback(
+    (currentStatusId: string) => {
+      const visibleStatuses = sortedStatuses.filter((status) => !status.hidden);
+      if (visibleStatuses.length === 0) {
+        return currentStatusId;
+      }
+
+      const currentIndex = visibleStatuses.findIndex(
+        (status) => status.id === currentStatusId
+      );
+      const nextIndex =
+        currentIndex >= 0 ? (currentIndex + 1) % visibleStatuses.length : 0;
+      return visibleStatuses[nextIndex].id;
+    },
+    [sortedStatuses]
+  );
 
   // Default create form values for the current create-default state + project context
   const createModeDefaults = useMemo<IssueFormData>(
@@ -660,6 +678,17 @@ export function KanbanIssuePanelContainer({
       if (kanbanCreateMode) {
         // For statusId, open the status selection dialog with callback
         if (field === 'statusId') {
+          if (!cloudFeaturesEnabled) {
+            const statusId = getNextStatusId(createFormFallback.statusId);
+            updateIssueComposerDraft({ statusId });
+            dispatchFormState({
+              type: 'patchCreateFormData',
+              patch: { statusId },
+              fallback: createFormFallback,
+            });
+            return;
+          }
+
           const { ProjectSelectionDialog } = await import(
             '@/shared/dialogs/command-bar/selections/ProjectSelectionDialog'
           );
@@ -681,6 +710,10 @@ export function KanbanIssuePanelContainer({
 
         // For priority, open the priority selection dialog with callback
         if (field === 'priority') {
+          if (!cloudFeaturesEnabled) {
+            return;
+          }
+
           const { ProjectSelectionDialog } = await import(
             '@/shared/dialogs/command-bar/selections/ProjectSelectionDialog'
           );
@@ -703,6 +736,10 @@ export function KanbanIssuePanelContainer({
 
         // For assigneeIds, open the assignee selection dialog with callback
         if (field === 'assigneeIds') {
+          if (!cloudFeaturesEnabled) {
+            return;
+          }
+
           const { AssigneeSelectionDialog } = await import(
             '@/shared/dialogs/kanban/AssigneeSelectionDialog'
           );
@@ -757,12 +794,26 @@ export function KanbanIssuePanelContainer({
           debouncedSaveDescription(value as string | null);
         }
       } else if (field === 'statusId') {
+        if (!cloudFeaturesEnabled) {
+          const statusId = getNextStatusId(displayData.statusId);
+          updateIssue(selectedKanbanIssueId, { status_id: statusId });
+          return;
+        }
+
         // Status changes go through the command bar status selection
         openStatusSelection(projectId, [selectedKanbanIssueId]);
       } else if (field === 'priority') {
+        if (!cloudFeaturesEnabled) {
+          return;
+        }
+
         // Priority changes go through the command bar priority selection
         openPrioritySelection(projectId, [selectedKanbanIssueId]);
       } else if (field === 'assigneeIds') {
+        if (!cloudFeaturesEnabled) {
+          return;
+        }
+
         // Assignee changes go through the assignee selection dialog
         openAssigneeSelection(projectId, [selectedKanbanIssueId], false);
       } else if (field === 'tagIds') {
@@ -801,11 +852,15 @@ export function KanbanIssuePanelContainer({
       createFormFallback,
       createFormData,
       hasPendingAttachments,
+      cloudFeaturesEnabled,
       debouncedSaveTitle,
       debouncedSaveDescription,
+      displayData.statusId,
+      getNextStatusId,
       openStatusSelection,
       openPrioritySelection,
       openAssigneeSelection,
+      updateIssue,
       updateIssueComposerDraft,
       setCreateDraftWorkspaceByDefault,
       issueTags,
@@ -850,7 +905,7 @@ export function KanbanIssuePanelContainer({
 
         // Commit only attachments still referenced in the description
         const allUploadedIds = getAttachmentIds();
-        if (allUploadedIds.length > 0) {
+        if (cloudFeaturesEnabled && allUploadedIds.length > 0) {
           const referencedIds = extractAttachmentIds(
             displayData.description ?? ''
           );
@@ -875,26 +930,28 @@ export function KanbanIssuePanelContainer({
         }
 
         // Create assignee records for all selected assignees
-        displayData.assigneeIds.forEach((userId) => {
-          insertIssueAssignee({
-            issue_id: syncedIssue.id,
-            user_id: userId,
+        if (cloudFeaturesEnabled) {
+          displayData.assigneeIds.forEach((userId) => {
+            insertIssueAssignee({
+              issue_id: syncedIssue.id,
+              user_id: userId,
+            });
           });
-        });
 
-        // Create tag records if tags were selected
-        for (const tagId of displayData.tagIds) {
-          insertIssueTag({
-            issue_id: syncedIssue.id,
-            tag_id: tagId,
-          });
+          // Create tag records if tags were selected
+          for (const tagId of displayData.tagIds) {
+            insertIssueTag({
+              issue_id: syncedIssue.id,
+              tag_id: tagId,
+            });
+          }
         }
 
         if (issueComposerKey) {
           closeKanbanIssueComposer(issueComposerKey);
         }
 
-        if (displayData.createDraftWorkspace) {
+        if (cloudFeaturesEnabled && displayData.createDraftWorkspace) {
           const initialPrompt = buildWorkspaceCreatePrompt(
             displayData.title,
             displayData.description
@@ -953,6 +1010,7 @@ export function KanbanIssuePanelContainer({
     insertIssueAssignee,
     insertIssueTag,
     openIssue,
+    cloudFeaturesEnabled,
     kanbanCreateDefaultParentIssueId,
     openWorkspaceCreateFromState,
     workspaces,
@@ -1053,29 +1111,35 @@ export function KanbanIssuePanelContainer({
       onParentIssueClick={handleParentIssueClick}
       onRemoveParentIssue={handleRemoveParentIssue}
       linkedPrs={linkedPrs}
-      onLinkPr={mode === 'edit' ? handleLinkPr : undefined}
+      onLinkPr={
+        cloudFeaturesEnabled && mode === 'edit' ? handleLinkPr : undefined
+      }
       onClose={closeKanbanIssuePanel}
       onSubmit={handleSubmit}
       onCmdEnterSubmit={handleCmdEnterSubmit}
-      onCreateTag={handleCreateTag}
-      renderAddTagControl={({
-        tags,
-        selectedTagIds,
-        onTagToggle,
-        onCreateTag,
-        disabled,
-        trigger,
-      }) => (
-        <SearchableTagDropdownContainer
-          tags={tags}
-          selectedTagIds={selectedTagIds}
-          onTagToggle={onTagToggle}
-          onCreateTag={onCreateTag}
-          disabled={disabled}
-          contentClassName=""
-          trigger={trigger}
-        />
-      )}
+      onCreateTag={cloudFeaturesEnabled ? handleCreateTag : undefined}
+      renderAddTagControl={
+        cloudFeaturesEnabled
+          ? ({
+              tags,
+              selectedTagIds,
+              onTagToggle,
+              onCreateTag,
+              disabled,
+              trigger,
+            }) => (
+              <SearchableTagDropdownContainer
+                tags={tags}
+                selectedTagIds={selectedTagIds}
+                onTagToggle={onTagToggle}
+                onCreateTag={onCreateTag}
+                disabled={disabled}
+                contentClassName=""
+                trigger={trigger}
+              />
+            )
+          : undefined
+      }
       isSubmitting={isSubmitting}
       descriptionSaveStatus={
         mode === 'edit' ? descriptionSaveStatus : undefined
@@ -1086,28 +1150,48 @@ export function KanbanIssuePanelContainer({
       }
       onCopyLink={mode === 'edit' ? handleCopyLink : undefined}
       onMoreActions={mode === 'edit' ? handleMoreActions : undefined}
-      onPasteFiles={onPasteFiles}
-      localAttachments={localAttachments}
-      dropzoneProps={{ getRootProps, getInputProps, isDragActive }}
-      onBrowseAttachment={openFilePicker}
-      isUploading={isUploading}
-      attachmentError={uploadError}
-      onDismissAttachmentError={clearUploadError}
+      onPasteFiles={cloudFeaturesEnabled ? onPasteFiles : undefined}
+      localAttachments={cloudFeaturesEnabled ? localAttachments : []}
+      dropzoneProps={
+        cloudFeaturesEnabled
+          ? { getRootProps, getInputProps, isDragActive }
+          : undefined
+      }
+      onBrowseAttachment={cloudFeaturesEnabled ? openFilePicker : undefined}
+      isUploading={cloudFeaturesEnabled && isUploading}
+      attachmentError={cloudFeaturesEnabled ? uploadError : null}
+      onDismissAttachmentError={
+        cloudFeaturesEnabled ? clearUploadError : undefined
+      }
+      showCreateDraftWorkspaceToggle={cloudFeaturesEnabled}
       renderDescriptionEditor={(props) => (
-        <WYSIWYGEditor {...props} localAttachments={localAttachments} />
+        <WYSIWYGEditor
+          {...props}
+          localAttachments={cloudFeaturesEnabled ? localAttachments : []}
+        />
       )}
-      renderWorkspacesSection={(issueId) => (
-        <IssueWorkspacesSectionContainer issueId={issueId} />
-      )}
-      renderRelationshipsSection={(issueId) => (
-        <IssueRelationshipsSectionContainer issueId={issueId} />
-      )}
-      renderSubIssuesSection={(issueId) => (
-        <IssueSubIssuesSectionContainer issueId={issueId} />
-      )}
-      renderCommentsSection={(issueId) => (
-        <IssueCommentsSectionContainer issueId={issueId} />
-      )}
+      renderWorkspacesSection={
+        cloudFeaturesEnabled
+          ? (issueId) => <IssueWorkspacesSectionContainer issueId={issueId} />
+          : undefined
+      }
+      renderRelationshipsSection={
+        cloudFeaturesEnabled
+          ? (issueId) => (
+              <IssueRelationshipsSectionContainer issueId={issueId} />
+            )
+          : undefined
+      }
+      renderSubIssuesSection={
+        cloudFeaturesEnabled
+          ? (issueId) => <IssueSubIssuesSectionContainer issueId={issueId} />
+          : undefined
+      }
+      renderCommentsSection={
+        cloudFeaturesEnabled
+          ? (issueId) => <IssueCommentsSectionContainer issueId={issueId} />
+          : undefined
+      }
     />
   );
 }

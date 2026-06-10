@@ -100,6 +100,13 @@ import {
   OpenRemoteWorkspaceInEditorRequest,
   OpenRemoteEditorResponse,
   ProfileResponse,
+  Project,
+  CreateProject,
+  UpdateProject,
+  Task,
+  CreateTask,
+  UpdateTask,
+  BulkUpdateTasksResponse,
 } from 'shared/types';
 import type { Project as RemoteProject } from 'shared/remote-types';
 import type { WorkspaceWithSession } from '@/shared/types/attempt';
@@ -1483,6 +1490,108 @@ export const remoteProjectsApi = {
     const result =
       await handleApiResponse<ListRemoteProjectsResponse>(response);
     return result.projects;
+  },
+};
+
+export const localProjectsApi = {
+  list: async (): Promise<Project[]> => {
+    const response = await makeRequest('/api/projects');
+    return handleApiResponse<Project[]>(response);
+  },
+
+  get: async (projectId: string): Promise<Project> => {
+    const response = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}`
+    );
+    return handleApiResponse<Project>(response);
+  },
+
+  create: async (data: CreateProject): Promise<Project> => {
+    const response = await makeRequest('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<Project>(response);
+  },
+
+  update: async (
+    projectId: string,
+    data: Partial<UpdateProject>
+  ): Promise<Project> => {
+    const response = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<Project>(response);
+  },
+
+  remove: async (projectId: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
+};
+
+export interface BulkUpdateLocalTaskItem {
+  id: string;
+  changes: Partial<UpdateTask>;
+}
+
+export const localTasksApi = {
+  listByProject: async (projectId: string): Promise<Task[]> => {
+    const response = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/tasks`
+    );
+    return handleApiResponse<Task[]>(response);
+  },
+
+  create: async (projectId: string, data: CreateTask): Promise<Task> => {
+    const response = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/tasks`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<Task>(response);
+  },
+
+  update: async (taskId: string, data: Partial<UpdateTask>): Promise<Task> => {
+    const response = await makeRequest(
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<Task>(response);
+  },
+
+  bulkUpdate: async (
+    updates: BulkUpdateLocalTaskItem[]
+  ): Promise<BulkUpdateTasksResponse> => {
+    const response = await makeRequest('/api/tasks/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ updates }),
+    });
+    return handleApiResponse<BulkUpdateTasksResponse>(response);
+  },
+
+  remove: async (taskId: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<void>(response);
   },
 };
 

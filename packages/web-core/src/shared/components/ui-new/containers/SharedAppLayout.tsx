@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router';
-import { siDiscord, siGithub } from 'simple-icons';
 import {
   XIcon,
   PlusIcon,
@@ -22,9 +22,8 @@ import { AppBarUserPopoverContainer } from './AppBarUserPopoverContainer';
 import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
 import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
-import { useDiscordOnlineCount } from '@/shared/hooks/useDiscordOnlineCount';
-import { useGitHubStars } from '@/shared/hooks/useGitHubStars';
 import { useUserSystem } from '@/shared/hooks/useUserSystem';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { useAppUpdateStore } from '@/shared/stores/useAppUpdateStore';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
@@ -38,6 +37,10 @@ import {
   CreateRemoteProjectDialog,
   type CreateRemoteProjectResult,
 } from '@/shared/dialogs/org/CreateRemoteProjectDialog';
+import {
+  CreateLocalProjectDialog,
+  type CreateLocalProjectResult,
+} from '@/shared/dialogs/org/CreateLocalProjectDialog';
 import { OAuthDialog } from '@/shared/dialogs/global/OAuthDialog';
 import { SettingsDialog } from '@/shared/dialogs/settings/SettingsDialog';
 import { CommandBarDialog } from '@/shared/dialogs/command-bar/CommandBarDialog';
@@ -55,8 +58,12 @@ import { WorkspacesSidebarContainer } from '@/pages/workspaces/WorkspacesSidebar
 import { WorkspacesSidebarReopenTag } from '@vibe/ui/components/WorkspacesSidebar';
 import { useRemoteCloudHostsAppBarModel } from '@/shared/hooks/useRemoteCloudHosts';
 import { CloudShutdownExportBanner } from '@/shared/components/CloudShutdownExportBanner';
+import { localProjectsApi } from '@/shared/lib/api';
+import { localProjectKeys } from '@/shared/providers/local/LocalOrgProvider';
+import { localProjectToRemoteProject } from '@/shared/providers/local/localKanbanAdapters';
 
 export function SharedAppLayout() {
+  const queryClient = useQueryClient();
   const appNavigation = useAppNavigation();
   const currentDestination = useCurrentAppDestination();
   const isMobile = useIsMobile();
@@ -65,11 +72,11 @@ export function SharedAppLayout() {
     (s) => s.isLeftSidebarVisible
   );
   const { isSignedIn } = useAuth();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+  const isCloudSignedIn = cloudFeaturesEnabled && isSignedIn;
   const { appVersion } = useUserSystem();
   const updateVersion = useAppUpdateStore((s) => s.updateVersion);
   const restartForUpdate = useAppUpdateStore((s) => s.restart);
-  const { data: onlineCount } = useDiscordOnlineCount();
-  const { data: starCount } = useGitHubStars();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAppBarHovered, setIsAppBarHovered] = useState(false);
   const { hosts: remoteCloudHosts } = useRemoteCloudHostsAppBarModel();
@@ -129,16 +136,30 @@ export function SharedAppLayout() {
     isLoading,
     updateMany: updateManyProjects,
   } = useShape(PROJECTS_SHAPE, projectParams, {
-    enabled: isSignedIn && !!selectedOrgId,
+    enabled: isCloudSignedIn && !!selectedOrgId,
     mutation: PROJECT_MUTATION,
+  });
+  const localProjectsQuery = useQuery({
+    queryKey: localProjectKeys.all,
+    queryFn: localProjectsApi.list,
+    enabled: !cloudFeaturesEnabled,
   });
   const sortedProjects = useMemo(
     () => sortProjectsByOrder(orgProjects),
     [orgProjects]
   );
+  const localProjects = useMemo(
+    () => (localProjectsQuery.data ?? []).map(localProjectToRemoteProject),
+    [localProjectsQuery.data]
+  );
   const [orderedProjects, setOrderedProjects] =
     useState<RemoteProject[]>(sortedProjects);
   const [isSavingProjectOrder, setIsSavingProjectOrder] = useState(false);
+  const appBarProjects = cloudFeaturesEnabled ? orderedProjects : localProjects;
+  const isKanbanAvailable = cloudFeaturesEnabled ? isCloudSignedIn : true;
+  const isAppBarProjectsLoading = cloudFeaturesEnabled
+    ? isLoading
+    : localProjectsQuery.isLoading;
 
   useEffect(() => {
     if (isSavingProjectOrder) {
@@ -150,6 +171,7 @@ export function SharedAppLayout() {
   // Navigate to the first ordered project when org changes
   useEffect(() => {
     if (
+      cloudFeaturesEnabled &&
       prevOrgIdRef.current !== null &&
       prevOrgIdRef.current !== selectedOrgId &&
       selectedOrgId &&
@@ -164,7 +186,13 @@ export function SharedAppLayout() {
     } else if (prevOrgIdRef.current === null && selectedOrgId) {
       prevOrgIdRef.current = selectedOrgId;
     }
-  }, [selectedOrgId, sortedProjects, isLoading, appNavigation]);
+  }, [
+    appNavigation,
+    cloudFeaturesEnabled,
+    isLoading,
+    selectedOrgId,
+    sortedProjects,
+  ]);
 
   // Navigation state for AppBar active indicators
   const projectDestination = useMemo(
@@ -174,7 +202,9 @@ export function SharedAppLayout() {
   const isWorkspacesActive = isLocalWorkspacesDestination(currentDestination);
   const isExportActive = currentDestination?.kind === 'export';
   const showCloudShutdownBanner =
-    isExportActive || (isSignedIn && isProjectDestination(currentDestination));
+    cloudFeaturesEnabled &&
+    (isExportActive ||
+      (isCloudSignedIn && isProjectDestination(currentDestination)));
   const isWorkspaceSidebarPreviewEnabled =
     !isMobile && isWorkspacesActive && !isLeftSidebarVisible;
   const activeProjectId = projectDestination?.projectId ?? null;
@@ -200,8 +230,9 @@ export function SharedAppLayout() {
   }, [navigate]);
 
   const handleExportClick = useCallback(() => {
+    if (!cloudFeaturesEnabled) return;
     appNavigation.goToExport();
-  }, [appNavigation]);
+  }, [appNavigation, cloudFeaturesEnabled]);
 
   const handleProjectClick = useCallback(
     (projectId: string) => {
@@ -213,6 +244,9 @@ export function SharedAppLayout() {
   const handleProjectsDragEnd = useCallback(
     async ({ source, destination }: DropResult) => {
       if (isSavingProjectOrder) {
+        return;
+      }
+      if (!cloudFeaturesEnabled) {
         return;
       }
       if (!destination || source.index === destination.index) {
@@ -245,10 +279,33 @@ export function SharedAppLayout() {
         setIsSavingProjectOrder(false);
       }
     },
-    [isSavingProjectOrder, orderedProjects, updateManyProjects]
+    [
+      cloudFeaturesEnabled,
+      isSavingProjectOrder,
+      orderedProjects,
+      updateManyProjects,
+    ]
   );
 
   const handleCreateProject = useCallback(async () => {
+    if (!cloudFeaturesEnabled) {
+      try {
+        const result: CreateLocalProjectResult =
+          await CreateLocalProjectDialog.show({});
+
+        await queryClient.invalidateQueries({
+          queryKey: localProjectKeys.all,
+        });
+
+        if (result.action === 'created' && result.project) {
+          appNavigation.goToProject(result.project.id);
+        }
+      } catch {
+        // Dialog cancelled
+      }
+      return;
+    }
+
     if (!selectedOrgId) return;
 
     try {
@@ -261,22 +318,28 @@ export function SharedAppLayout() {
     } catch {
       // Dialog cancelled
     }
-  }, [selectedOrgId, appNavigation]);
+  }, [appNavigation, cloudFeaturesEnabled, queryClient, selectedOrgId]);
 
   const handleSignIn = useCallback(async () => {
+    if (!cloudFeaturesEnabled) return;
     try {
       await OAuthDialog.show({});
     } catch {
       // Dialog cancelled
     }
-  }, []);
+  }, [cloudFeaturesEnabled]);
 
-  const openRelaySettings = useCallback((hostId?: string) => {
-    void SettingsDialog.show({
-      initialSection: 'relay',
-      ...(hostId ? { initialState: { hostId } } : {}),
-    });
-  }, []);
+  const openRelaySettings = useCallback(
+    (hostId?: string) => {
+      if (!cloudFeaturesEnabled) return;
+
+      void SettingsDialog.show({
+        initialSection: 'relay',
+        ...(hostId ? { initialState: { hostId } } : {}),
+      });
+    },
+    [cloudFeaturesEnabled]
+  );
 
   const handleHostClick = useCallback(
     (hostId: string, status: AppBarHostStatus) => {
@@ -331,27 +394,34 @@ export function SharedAppLayout() {
             />
             {/* Desktop AppBar sidebar. */}
             <AppBar
-              projects={orderedProjects}
-              hosts={remoteCloudHosts}
+              projects={appBarProjects}
+              hosts={cloudFeaturesEnabled ? remoteCloudHosts : []}
               activeHostId={activeHostId}
               onCreateProject={handleCreateProject}
-              onExportClick={handleExportClick}
+              onExportClick={
+                cloudFeaturesEnabled ? handleExportClick : undefined
+              }
               onWorkspacesClick={handleWorkspacesClick}
               onHostClick={handleHostClick}
-              onPairHostClick={handlePairHostClick}
+              onPairHostClick={
+                cloudFeaturesEnabled ? handlePairHostClick : undefined
+              }
               onProjectClick={handleProjectClick}
               onProjectsDragEnd={handleProjectsDragEnd}
               isSavingProjectOrder={isSavingProjectOrder}
               isWorkspacesActive={isWorkspacesActive}
               isExportActive={isExportActive}
+              showProjectsSection
               activeProjectId={activeProjectId}
-              isSignedIn={isSignedIn}
-              isLoadingProjects={isLoading}
-              onSignIn={handleSignIn}
+              isSignedIn={isKanbanAvailable}
+              isLoadingProjects={isAppBarProjectsLoading}
+              onSignIn={cloudFeaturesEnabled ? handleSignIn : undefined}
               onHoverStart={() => setIsAppBarHovered(true)}
               onHoverEnd={() => setIsAppBarHovered(false)}
               notificationBell={
-                isSignedIn ? <AppBarNotificationBellContainer /> : undefined
+                isCloudSignedIn ? (
+                  <AppBarNotificationBellContainer />
+                ) : undefined
               }
               userPopover={
                 <AppBarUserPopoverContainer
@@ -360,13 +430,9 @@ export function SharedAppLayout() {
                   onOrgSelect={setSelectedOrgId}
                 />
               }
-              starCount={starCount}
-              onlineCount={onlineCount}
               appVersion={appVersion}
               updateVersion={updateVersion}
               onUpdateClick={restartForUpdate ?? undefined}
-              githubIconPath={siGithub.path}
-              discordIconPath={siDiscord.path}
             />
             {/* Desktop content. */}
             <div className="relative min-h-0 overflow-hidden">
@@ -428,8 +494,10 @@ export function SharedAppLayout() {
             {/* Header: org name + close button */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <span className="text-sm font-medium text-high truncate">
-                {organizations.find((o) => o.id === selectedOrgId)?.name ??
-                  'Organization'}
+                {cloudFeaturesEnabled
+                  ? (organizations.find((o) => o.id === selectedOrgId)?.name ??
+                    'Organization')
+                  : 'Vibe Kanban'}
               </span>
               <button
                 type="button"
@@ -457,7 +525,7 @@ export function SharedAppLayout() {
             <div className="border-t border-border mx-4" />
 
             {/* Export link */}
-            {isSignedIn && (
+            {isCloudSignedIn && (
               <div className="px-4 py-3">
                 <p className="mb-2 text-xs font-medium text-low">Export</p>
                 <button
@@ -475,12 +543,12 @@ export function SharedAppLayout() {
             )}
 
             {/* Divider */}
-            {isSignedIn && <div className="border-t border-border mx-4" />}
+            {isCloudSignedIn && <div className="border-t border-border mx-4" />}
 
             {/* Project list */}
-            <div className="flex-1 overflow-y-auto p-2">
-              {isSignedIn ? (
-                orderedProjects.map((project) => (
+            {isKanbanAvailable && (
+              <div className="flex-1 overflow-y-auto p-2">
+                {appBarProjects.map((project) => (
                   <button
                     type="button"
                     key={project.id}
@@ -502,8 +570,12 @@ export function SharedAppLayout() {
                     />
                     <span className="truncate">{project.name}</span>
                   </button>
-                ))
-              ) : (
+                ))}
+              </div>
+            )}
+
+            {cloudFeaturesEnabled && !isCloudSignedIn && (
+              <div className="flex-1 overflow-y-auto p-2">
                 <div className="px-4 py-6 text-center">
                   <KanbanIcon
                     className="h-8 w-8 mx-auto text-low"
@@ -528,11 +600,11 @@ export function SharedAppLayout() {
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Create Project button */}
-            {isSignedIn && (
+            {isKanbanAvailable && (
               <div className="p-3 border-t border-border">
                 <button
                   type="button"
