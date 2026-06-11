@@ -1,0 +1,226 @@
+---
+title: "Connect Direct SSH Hosts"
+description: "Run Vibe Kanban on an SSH server and control remote Claude Code workspaces from your local kanban board"
+---
+
+Direct SSH hosts let your local Vibe Kanban instance control workspaces on a remote Linux server without exposing the remote Vibe Kanban port to the public internet.
+
+The remote server runs its own Vibe Kanban service bound to `127.0.0.1:3000`. Your local Vibe Kanban connects to that private API through an SSH tunnel and can schedule work against the remote server's Claude Code installation.
+
+<Warning>
+Keep the remote Vibe Kanban service bound to `127.0.0.1`. Do not expose port `3000` publicly unless you have added your own network controls.
+</Warning>
+
+## Prerequisites
+
+Before you connect a new server, make sure you have:
+
+- A local Vibe Kanban instance running.
+- SSH key access from your local machine to the remote server.
+- Claude Code installed on the remote server.
+- `sudo` access on the remote server if you want to install Node.js or create a systemd service.
+- Node.js `20.19.0` or newer on the remote server.
+
+## 1. Add an SSH alias
+
+Add an alias to your local `~/.ssh/config`:
+
+```sshconfig
+Host your-host
+  HostName 203.0.113.10
+  User ubuntu
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+If the server needs a local SOCKS proxy, add a `ProxyCommand`:
+
+```sshconfig
+Host your-host
+  HostName 203.0.113.10
+  User ubuntu
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyCommand nc -X 5 -x 127.0.0.1:7890 %h %p
+```
+
+Verify that SSH resolves the alias correctly:
+
+```bash
+ssh -G your-host | grep -E '^(host|hostname|user|port|identityfile|proxycommand) '
+```
+
+## 2. Check remote server requirements
+
+Run a quick remote check:
+
+```bash
+ssh your-host 'hostname; whoami; claude --version; node --version || true; npm --version || true'
+```
+
+You should see:
+
+- The expected remote hostname and user.
+- A Claude Code version.
+- Node.js `20.19.0` or newer.
+
+If Node.js is too old, install a newer version. One simple option is `n`:
+
+```bash
+ssh your-host 'sudo npm install -g n && sudo n 22.16.0 && hash -r && node --version'
+```
+
+<Info>
+If `node --version` still shows the old version after installation, start a new SSH session and check again.
+</Info>
+
+## 3. Cache the Vibe Kanban binary
+
+Run the NPX wrapper once on the remote server:
+
+```bash
+ssh your-host 'npx -y vibe-kanban --help'
+```
+
+Then find the cached Vibe Kanban binary:
+
+```bash
+ssh your-host 'find ~/.vibe-kanban/bin -maxdepth 4 -type f -name vibe-kanban | sort | tail -1'
+```
+
+Save the returned path. You will use it as `ExecStart` in the systemd service.
+
+## 4. Create the remote systemd service
+
+SSH into the remote server:
+
+```bash
+ssh your-host
+```
+
+Create and start the service:
+
+```bash
+export VK_USER="$(whoami)"
+export VK_HOME="$HOME"
+export VK_BIN="$(find "$HOME/.vibe-kanban/bin" -maxdepth 4 -type f -name vibe-kanban | sort | tail -1)"
+
+test -x "$VK_BIN"
+
+sudo tee /etc/systemd/system/vibe-kanban.service >/dev/null <<EOF
+[Unit]
+Description=Vibe Kanban remote host service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$VK_USER
+WorkingDirectory=$VK_HOME
+Environment=HOME=$VK_HOME
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=HOST=127.0.0.1
+Environment=BACKEND_PORT=3000
+Environment=FRONTEND_PORT=3002
+Environment=RUST_LOG=info
+ExecStart=$VK_BIN
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable vibe-kanban.service
+sudo systemctl restart vibe-kanban.service
+```
+
+Check the service:
+
+```bash
+systemctl is-enabled vibe-kanban.service
+systemctl is-active vibe-kanban.service
+curl -fsS http://127.0.0.1:3000/api/health && echo
+```
+
+Expected result:
+
+```json
+{"success":true,"data":"OK","error_data":null,"message":null}
+```
+
+Exit the SSH session when the service is healthy.
+
+## 5. Add the direct host in Vibe Kanban
+
+Open your local Vibe Kanban settings and go to **Direct Hosts**.
+
+Add a host with these values:
+
+| Field | Value |
+| ----- | ----- |
+| Name | `your-host` |
+| SSH Host | `your-host` |
+| SSH User | `ubuntu` or the remote SSH user |
+| SSH Port | `22` |
+| Remote API Host | `127.0.0.1` |
+| Remote API Port | `3000` |
+
+<Tip>
+Use the SSH alias in **SSH Host**, not the raw IP address. This lets SSH apply `IdentityFile`, `ProxyCommand`, and any other host-specific settings from `~/.ssh/config`.
+</Tip>
+
+## 6. Verify the local proxy
+
+List configured direct hosts:
+
+```bash
+curl -sS http://localhost:3001/api/direct-hosts
+```
+
+Copy the host `id`, then check the proxied remote API:
+
+```bash
+curl -i http://localhost:3001/api/host/HOST_ID/health
+curl -i http://localhost:3001/api/host/HOST_ID/workspaces
+```
+
+Both commands should return `200 OK`.
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="The remote API returns connection refused">
+The remote Vibe Kanban service is not running, or it is not listening on `127.0.0.1:3000`.
+
+Check it on the remote server:
+
+```bash
+systemctl status vibe-kanban.service
+curl -fsS http://127.0.0.1:3000/api/health
+ss -ltnp | grep ':3000'
+```
+</Accordion>
+
+<Accordion title="The local proxy returns 502">
+The local Vibe Kanban instance could not reach the remote API through SSH.
+
+Check:
+
+- The direct host uses the SSH alias, not the raw IP address.
+- `ssh your-host 'curl -fsS http://127.0.0.1:3000/api/health'` succeeds.
+- The configured Remote API Port matches the systemd `BACKEND_PORT`.
+</Accordion>
+
+<Accordion title="npx vibe-kanban fails with CustomEvent is not defined">
+The remote Node.js version is too old. Install Node.js `20.19.0` or newer, then run `npx -y vibe-kanban --help` again.
+</Accordion>
+
+<Accordion title="The host appears online but requests fail">
+Treat `/api/host/HOST_ID/health` as the source of truth. A saved host entry can exist even when the remote service is stopped.
+</Accordion>
+</AccordionGroup>
+
