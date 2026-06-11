@@ -39,6 +39,7 @@ interface AppBarProps {
   projects: AppBarProject[];
   hosts?: AppBarHost[];
   onPairHostClick?: () => void;
+  remoteHostActionLabel?: string;
   activeHostId?: string | null;
   onCreateProject: () => void;
   onExportClick?: () => void;
@@ -188,6 +189,7 @@ export function AppBar({
   projects,
   hosts = [],
   onPairHostClick,
+  remoteHostActionLabel = 'Pair a remote device',
   activeHostId = null,
   onCreateProject,
   onExportClick,
@@ -255,7 +257,7 @@ export function AppBar({
               {
                 key: 'pair-remote-device',
                 kind: 'icon-button' as const,
-                label: 'Pair a remote device',
+                label: remoteHostActionLabel,
                 icon: LinkIcon,
                 onClick: onPairHostClick,
                 className:

@@ -153,3 +153,24 @@ export function localTaskToIssue(task: Task, index: number): Issue {
     updated_at: task.updated_at,
   };
 }
+
+export function localTaskToWorkspace(task: Task): Workspace | null {
+  if (!task.parent_workspace_id) {
+    return null;
+  }
+
+  return {
+    id: task.parent_workspace_id,
+    project_id: task.project_id,
+    owner_user_id: LOCAL_ORGANIZATION_ID,
+    issue_id: task.id,
+    local_workspace_id: task.parent_workspace_id,
+    name: task.title,
+    archived: task.status === 'cancelled',
+    files_changed: 0,
+    lines_added: 0,
+    lines_removed: 0,
+    created_at: task.created_at,
+    updated_at: task.updated_at,
+  };
+}

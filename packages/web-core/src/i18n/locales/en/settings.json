@@ -31,6 +31,8 @@
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Projects",
         "remote-projectsDesc": "Manage projects",
+        "direct-hosts": "Direct Hosts",
+        "direct-hostsDesc": "SSH-connected execution hosts",
         "relay": "Remote Access",
         "relayDesc": "Relay tunnel and enrollment"
       }

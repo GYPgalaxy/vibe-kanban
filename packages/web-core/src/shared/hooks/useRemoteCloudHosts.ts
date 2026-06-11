@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AppBarHost, AppBarHostStatus } from '@vibe/ui/components/AppBar';
-import type { PairRelayHostRequest, RelayPairedHost } from 'shared/types';
+import type {
+  DirectHost,
+  PairRelayHostRequest,
+  RelayPairedHost,
+} from 'shared/types';
 import type { RelayHost } from 'shared/remote-types';
-import { relayApi } from '@/shared/lib/api';
+import { directHostsApi, relayApi } from '@/shared/lib/api';
 import { listRelayHosts } from '@/shared/lib/remoteApi';
-import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
+import {
+  useAppRuntime,
+  useCloudFeaturesEnabled,
+} from '@/shared/hooks/useAppRuntime';
 
 export type RemoteCloudHostStatus = AppBarHostStatus;
 
@@ -72,13 +79,35 @@ async function fetchRemoteCloudHostsState(): Promise<RemoteCloudHostsState> {
   return { hosts };
 }
 
+function mapDirectHostStatus(host: DirectHost): RemoteCloudHostStatus {
+  return host.status === 'online' ? 'online' : 'offline';
+}
+
+async function fetchLocalDirectHostsState(): Promise<RemoteCloudHostsState> {
+  const directHosts = await directHostsApi.list();
+
+  const hosts = directHosts.map((host) => ({
+    id: host.id,
+    name: host.name,
+    status: mapDirectHostStatus(host),
+    pairedAt: host.created_at,
+    lastUsedAt: host.updated_at,
+  }));
+
+  return { hosts };
+}
+
 export function useRemoteCloudHostsState() {
+  const runtime = useAppRuntime();
   const cloudFeaturesEnabled = useCloudFeaturesEnabled();
+  const useDirectHosts = runtime === 'local' && !cloudFeaturesEnabled;
 
   return useQuery({
-    queryKey: REMOTE_CLOUD_HOSTS_STATE_QUERY_KEY,
-    queryFn: fetchRemoteCloudHostsState,
-    enabled: cloudFeaturesEnabled,
+    queryKey: [...REMOTE_CLOUD_HOSTS_STATE_QUERY_KEY, runtime, useDirectHosts],
+    queryFn: useDirectHosts
+      ? fetchLocalDirectHostsState
+      : fetchRemoteCloudHostsState,
+    enabled: useDirectHosts || cloudFeaturesEnabled,
     staleTime: 0,
   });
 }
@@ -114,10 +143,9 @@ export function useRemoteCloudHostsAppBarModel(): {
   hosts: AppBarHost[];
   remoteHosts: RemoteCloudHost[];
 } {
-  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { data } = useRemoteCloudHostsState();
 
-  const remoteHosts = cloudFeaturesEnabled ? (data?.hosts ?? []) : [];
+  const remoteHosts = data?.hosts ?? [];
 
   const hosts = useMemo<AppBarHost[]>(
     () =>

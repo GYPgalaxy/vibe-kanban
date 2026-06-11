@@ -951,7 +951,7 @@ export function KanbanIssuePanelContainer({
           closeKanbanIssueComposer(issueComposerKey);
         }
 
-        if (cloudFeaturesEnabled && displayData.createDraftWorkspace) {
+        if (displayData.createDraftWorkspace) {
           const initialPrompt = buildWorkspaceCreatePrompt(
             displayData.title,
             displayData.description
@@ -1163,7 +1163,7 @@ export function KanbanIssuePanelContainer({
       onDismissAttachmentError={
         cloudFeaturesEnabled ? clearUploadError : undefined
       }
-      showCreateDraftWorkspaceToggle={cloudFeaturesEnabled}
+      showCreateDraftWorkspaceToggle
       renderDescriptionEditor={(props) => (
         <WYSIWYGEditor
           {...props}
@@ -1171,7 +1171,7 @@ export function KanbanIssuePanelContainer({
         />
       )}
       renderWorkspacesSection={
-        cloudFeaturesEnabled
+        mode === 'edit'
           ? (issueId) => <IssueWorkspacesSectionContainer issueId={issueId} />
           : undefined
       }

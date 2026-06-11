@@ -27,6 +27,8 @@
         "organizationsDesc": "管理组织成员和权限",
         "remote-projects": "项目",
         "remote-projectsDesc": "管理项目",
+        "direct-hosts": "直连主机",
+        "direct-hostsDesc": "通过 SSH 连接的执行主机",
         "relay": "Remote Access",
         "relayDesc": "Relay tunnel and enrollment",
         "machineSettings": "Machine Settings",

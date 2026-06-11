@@ -37,10 +37,10 @@ import {
   EMPTY_LOCAL_PULL_REQUEST_ISSUES,
   EMPTY_LOCAL_PULL_REQUESTS,
   EMPTY_LOCAL_TAGS,
-  EMPTY_LOCAL_WORKSPACES,
   isTaskStatus,
   localStatusesForProject,
   localTaskToIssue,
+  localTaskToWorkspace,
 } from './localKanbanAdapters';
 
 export const localTaskKeys = {
@@ -103,6 +103,13 @@ export function LocalProjectProvider({
     () => localStatusesForProject(projectId),
     [projectId]
   );
+  const workspaces = useMemo(
+    () =>
+      (tasksQuery.data ?? [])
+        .map(localTaskToWorkspace)
+        .filter((workspace) => workspace !== null),
+    [tasksQuery.data]
+  );
 
   const issuesById = useMemo(() => {
     const map = new Map<string, Issue>();
@@ -144,6 +151,11 @@ export function LocalProjectProvider({
   const getTag = useCallback(
     (tagId: string) => tagsById.get(tagId),
     [tagsById]
+  );
+  const getWorkspacesForIssue = useCallback(
+    (issueId: string) =>
+      workspaces.filter((workspace) => workspace.issue_id === issueId),
+    [workspaces]
   );
 
   const insertIssue = useCallback(
@@ -238,7 +250,7 @@ export function LocalProjectProvider({
       issueRelationships: EMPTY_LOCAL_ISSUE_RELATIONSHIPS,
       pullRequests: EMPTY_LOCAL_PULL_REQUESTS,
       pullRequestIssues: EMPTY_LOCAL_PULL_REQUEST_ISSUES,
-      workspaces: EMPTY_LOCAL_WORKSPACES,
+      workspaces,
       isLoading: tasksQuery.isLoading,
       error: tasksQuery.error ? { message: tasksQuery.error.message } : null,
       retry: () => {
@@ -321,7 +333,7 @@ export function LocalProjectProvider({
       getStatus,
       getTag,
       getPullRequestsForIssue: () => EMPTY_LOCAL_PULL_REQUESTS,
-      getWorkspacesForIssue: () => EMPTY_LOCAL_WORKSPACES,
+      getWorkspacesForIssue,
       issuesById,
       statusesById,
       tagsById,
@@ -330,6 +342,7 @@ export function LocalProjectProvider({
       projectId,
       issues,
       statuses,
+      workspaces,
       tasksQuery,
       insertIssue,
       updateIssue,
@@ -339,6 +352,7 @@ export function LocalProjectProvider({
       getIssuesForStatus,
       getStatus,
       getTag,
+      getWorkspacesForIssue,
       issuesById,
       statusesById,
       tagsById,

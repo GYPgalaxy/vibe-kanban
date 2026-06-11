@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { workspacesApi } from '@/shared/lib/api';
+import { localTasksApi, workspacesApi } from '@/shared/lib/api';
 import type { CreateAndStartWorkspaceRequest } from 'shared/types';
 import { workspaceSummaryKeys } from '@/shared/hooks/workspaceSummaryKeys';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 
 interface CreateWorkspaceParams {
   data: CreateAndStartWorkspaceRequest;
@@ -13,6 +14,7 @@ interface CreateWorkspaceParams {
 
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
 
   const createWorkspace = useMutation({
     mutationFn: async ({ data, linkToIssue }: CreateWorkspaceParams) => {
@@ -20,11 +22,17 @@ export function useCreateWorkspace() {
 
       if (linkToIssue && workspace) {
         try {
-          await workspacesApi.linkToIssue(
-            workspace.id,
-            linkToIssue.remoteProjectId,
-            linkToIssue.issueId
-          );
+          if (cloudFeaturesEnabled) {
+            await workspacesApi.linkToIssue(
+              workspace.id,
+              linkToIssue.remoteProjectId,
+              linkToIssue.issueId
+            );
+          } else {
+            await localTasksApi.update(linkToIssue.issueId, {
+              parent_workspace_id: workspace.id,
+            });
+          }
         } catch (linkError) {
           console.error('Failed to link workspace to issue:', linkError);
         }
@@ -35,6 +43,7 @@ export function useCreateWorkspace() {
     onSuccess: () => {
       // Invalidate workspace summaries so they refresh with the new workspace included
       queryClient.invalidateQueries({ queryKey: workspaceSummaryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['local-project-tasks'] });
       // Ensure create-mode defaults refetch the latest session/model selection.
       queryClient.invalidateQueries({ queryKey: ['workspaceCreateDefaults'] });
     },

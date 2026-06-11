@@ -97,6 +97,10 @@ import {
   RelayPairedHost,
   ListRelayPairedHostsResponse,
   RemoveRelayPairedHostResponse,
+  DirectHost,
+  CreateDirectHostRequest,
+  UpdateDirectHostRequest,
+  ListDirectHostsResponse,
   OpenRemoteWorkspaceInEditorRequest,
   OpenRemoteEditorResponse,
   ProfileResponse,
@@ -141,6 +145,19 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
   return makeLocalApiRequest(url, {
     ...options,
     headers,
+  });
+};
+
+const makeLocalOnlyRequest = async (url: string, options: RequestInit = {}) => {
+  const headers = new Headers(options.headers ?? {});
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return makeLocalApiRequest(url, {
+    ...options,
+    headers,
+    hostScope: 'none',
   });
 };
 
@@ -1495,19 +1512,19 @@ export const remoteProjectsApi = {
 
 export const localProjectsApi = {
   list: async (): Promise<Project[]> => {
-    const response = await makeRequest('/api/projects');
+    const response = await makeLocalOnlyRequest('/api/projects');
     return handleApiResponse<Project[]>(response);
   },
 
   get: async (projectId: string): Promise<Project> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/projects/${encodeURIComponent(projectId)}`
     );
     return handleApiResponse<Project>(response);
   },
 
   create: async (data: CreateProject): Promise<Project> => {
-    const response = await makeRequest('/api/projects', {
+    const response = await makeLocalOnlyRequest('/api/projects', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -1518,7 +1535,7 @@ export const localProjectsApi = {
     projectId: string,
     data: Partial<UpdateProject>
   ): Promise<Project> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/projects/${encodeURIComponent(projectId)}`,
       {
         method: 'PUT',
@@ -1529,7 +1546,7 @@ export const localProjectsApi = {
   },
 
   remove: async (projectId: string): Promise<void> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/projects/${encodeURIComponent(projectId)}`,
       {
         method: 'DELETE',
@@ -1546,14 +1563,14 @@ export interface BulkUpdateLocalTaskItem {
 
 export const localTasksApi = {
   listByProject: async (projectId: string): Promise<Task[]> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/projects/${encodeURIComponent(projectId)}/tasks`
     );
     return handleApiResponse<Task[]>(response);
   },
 
   create: async (projectId: string, data: CreateTask): Promise<Task> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/projects/${encodeURIComponent(projectId)}/tasks`,
       {
         method: 'POST',
@@ -1564,7 +1581,7 @@ export const localTasksApi = {
   },
 
   update: async (taskId: string, data: Partial<UpdateTask>): Promise<Task> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/tasks/${encodeURIComponent(taskId)}`,
       {
         method: 'PUT',
@@ -1577,7 +1594,7 @@ export const localTasksApi = {
   bulkUpdate: async (
     updates: BulkUpdateLocalTaskItem[]
   ): Promise<BulkUpdateTasksResponse> => {
-    const response = await makeRequest('/api/tasks/bulk', {
+    const response = await makeLocalOnlyRequest('/api/tasks/bulk', {
       method: 'POST',
       body: JSON.stringify({ updates }),
     });
@@ -1585,7 +1602,7 @@ export const localTasksApi = {
   },
 
   remove: async (taskId: string): Promise<void> => {
-    const response = await makeRequest(
+    const response = await makeLocalOnlyRequest(
       `/api/tasks/${encodeURIComponent(taskId)}`,
       {
         method: 'DELETE',
@@ -1768,6 +1785,46 @@ export const relayApi = {
       body: JSON.stringify(payload),
     });
     return handleApiResponse<OpenRemoteEditorResponse>(response);
+  },
+};
+
+export const directHostsApi = {
+  list: async (): Promise<DirectHost[]> => {
+    const response = await makeRequest('/api/direct-hosts');
+    const body = await handleApiResponse<ListDirectHostsResponse>(response);
+    return body.hosts;
+  },
+
+  create: async (payload: CreateDirectHostRequest): Promise<DirectHost> => {
+    const response = await makeRequest('/api/direct-hosts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return handleApiResponse<DirectHost>(response);
+  },
+
+  update: async (
+    hostId: string,
+    payload: UpdateDirectHostRequest
+  ): Promise<DirectHost> => {
+    const response = await makeRequest(
+      `/api/direct-hosts/${encodeURIComponent(hostId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleApiResponse<DirectHost>(response);
+  },
+
+  delete: async (hostId: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/direct-hosts/${encodeURIComponent(hostId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    await handleApiResponse<void>(response);
   },
 };
 

@@ -306,6 +306,16 @@ export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
 
 export type AgentPresetOptionsQuery = { executor: BaseCodingAgent, variant: string | null, };
 
+export type DirectHostStatus = "online" | "offline";
+
+export type DirectHost = { id: string, name: string, ssh_host: string, ssh_port: number, ssh_user: string | null, remote_api_host: string, remote_api_port: number, created_at: string, updated_at: string, status: DirectHostStatus, };
+
+export type CreateDirectHostRequest = { name: string, ssh_host: string, ssh_port: number | null, ssh_user: string | null, remote_api_host: string | null, remote_api_port: number | null, };
+
+export type UpdateDirectHostRequest = { name: string | null, ssh_host: string | null, ssh_port: number | null, ssh_user: string | null, remote_api_host: string | null, remote_api_port: number | null, };
+
+export type ListDirectHostsResponse = { hosts: Array<DirectHost>, };
+
 export type CurrentUserResponse = { user_id: string, };
 
 export type StartSpake2EnrollmentRequest = { enrollment_code: string, client_message_b64: string, };

@@ -6,6 +6,7 @@ import {
   CpuIcon,
   PlugIcon,
   BroadcastIcon,
+  HardDriveIcon,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { GeneralSettingsSection } from './GeneralSettingsSection';
@@ -15,6 +16,7 @@ import { RemoteProjectsSettingsSection } from './RemoteProjectsSettingsSection';
 import { AgentsSettingsSection } from './AgentsSettingsSection';
 import { McpSettingsSection } from './McpSettingsSection';
 import { RelaySettingsSectionContent } from './RelaySettingsSection';
+import { DirectHostsSettingsSection } from './DirectHostsSettingsSection';
 
 export type SettingsSectionType =
   | 'general'
@@ -23,6 +25,7 @@ export type SettingsSectionType =
   | 'remote-projects'
   | 'agents'
   | 'mcp'
+  | 'direct-hosts'
   | 'relay';
 
 export type SettingsSectionGroup = 'host' | 'universal';
@@ -36,6 +39,7 @@ export type SettingsSectionInitialState = {
     | undefined;
   agents: { executor?: string; variant?: string } | undefined;
   mcp: undefined;
+  'direct-hosts': { hostId?: string } | undefined;
   relay: { hostId?: string } | undefined;
 };
 
@@ -50,6 +54,7 @@ export const SETTINGS_SECTION_DEFINITIONS: SettingsSectionDefinition[] = [
   { id: 'repos', icon: GitBranchIcon, group: 'host' },
   { id: 'agents', icon: CpuIcon, group: 'host' },
   { id: 'mcp', icon: PlugIcon, group: 'host' },
+  { id: 'direct-hosts', icon: HardDriveIcon, group: 'host' },
   { id: 'organizations', icon: BuildingsIcon, group: 'universal' },
   { id: 'remote-projects', icon: CloudIcon, group: 'universal' },
   { id: 'relay', icon: BroadcastIcon, group: 'universal' },
@@ -92,6 +97,14 @@ export function renderSettingsSection(
       return <AgentsSettingsSection />;
     case 'mcp':
       return <McpSettingsSection />;
+    case 'direct-hosts':
+      return (
+        <DirectHostsSettingsSection
+          initialState={
+            initialState as SettingsSectionInitialState['direct-hosts']
+          }
+        />
+      );
     case 'relay':
       return (
         <RelaySettingsSectionContent

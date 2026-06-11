@@ -9,6 +9,7 @@ use crate::{DeploymentImpl, middleware};
 pub mod approvals;
 pub mod config;
 pub mod containers;
+pub mod direct_hosts;
 pub mod filesystem;
 // pub mod github;
 pub mod attachments;
@@ -70,6 +71,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .with_state(deployment.clone());
 
     let api_routes = Router::new()
+        .merge(direct_hosts::router())
         .merge(relay_auth::router())
         .merge(host_relay::router(&deployment))
         .merge(relay_signed_routes)

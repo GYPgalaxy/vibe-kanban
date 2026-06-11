@@ -26,6 +26,7 @@ export interface LocalApiTransport {
 }
 
 const LOCAL_ONLY_API_PREFIXES = [
+  '/api/direct-hosts',
   '/api/open-remote-editor/',
   '/api/relay-auth/server/',
   '/api/relay-auth/client/',

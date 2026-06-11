@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { LinkIcon, PlusIcon } from '@phosphor-icons/react';
@@ -9,7 +10,8 @@ import { useUserContext } from '@/shared/hooks/useUserContext';
 import { useWorkspaceContext } from '@/shared/hooks/useWorkspaceContext';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useProjectWorkspaceCreateDraft } from '@/shared/hooks/useProjectWorkspaceCreateDraft';
-import { workspacesApi } from '@/shared/lib/api';
+import { localTasksApi, workspacesApi } from '@/shared/lib/api';
+import { useCloudFeaturesEnabled } from '@/shared/hooks/useAppRuntime';
 import { getWorkspaceDefaults } from '@/shared/lib/workspaceDefaults';
 import {
   buildLinkedIssueCreateState,
@@ -36,8 +38,10 @@ export function IssueWorkspacesSectionContainer({
 }: IssueWorkspacesSectionContainerProps) {
   const { t } = useTranslation('common');
   const { projectId } = useParams({ strict: false });
+  const queryClient = useQueryClient();
   const appNavigation = useAppNavigation();
   const { openWorkspaceCreateFromState } = useProjectWorkspaceCreateDraft();
+  const cloudFeaturesEnabled = useCloudFeaturesEnabled();
   const { userId } = useAuth();
   const { workspaces } = useUserContext();
 
@@ -217,7 +221,16 @@ export function IssueWorkspacesSectionContainer({
 
       if (result === 'confirmed') {
         try {
-          await workspacesApi.unlinkFromIssue(localWorkspaceId);
+          if (cloudFeaturesEnabled) {
+            await workspacesApi.unlinkFromIssue(localWorkspaceId);
+          } else {
+            await localTasksApi.update(issueId, {
+              parent_workspace_id: null,
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ['local-project-tasks'],
+            });
+          }
         } catch (error) {
           ConfirmDialog.show({
             title: t('common:error'),
@@ -231,7 +244,7 @@ export function IssueWorkspacesSectionContainer({
         }
       }
     },
-    [t]
+    [cloudFeaturesEnabled, issueId, queryClient, t]
   );
 
   // Handle deleting a workspace (unlinks first, then deletes local)
@@ -269,7 +282,16 @@ export function IssueWorkspacesSectionContainer({
         await workspacesApi.delete(localWorkspaceId, result.deleteBranches);
         // Unlink from remote after successful deletion
         if (result.unlinkFromIssue) {
-          await workspacesApi.unlinkFromIssue(localWorkspaceId);
+          if (cloudFeaturesEnabled) {
+            await workspacesApi.unlinkFromIssue(localWorkspaceId);
+          } else {
+            await localTasksApi.update(issueId, {
+              parent_workspace_id: null,
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ['local-project-tasks'],
+            });
+          }
         }
       } catch (error) {
         ConfirmDialog.show({
@@ -283,7 +305,15 @@ export function IssueWorkspacesSectionContainer({
         });
       }
     },
-    [localWorkspacesById, workspacesWithStats, t, issueId, getIssue]
+    [
+      localWorkspacesById,
+      workspacesWithStats,
+      t,
+      issueId,
+      getIssue,
+      cloudFeaturesEnabled,
+      queryClient,
+    ]
   );
 
   // Actions for the section header
@@ -293,12 +323,16 @@ export function IssueWorkspacesSectionContainer({
         icon: PlusIcon,
         onClick: handleAddWorkspace,
       },
-      {
-        icon: LinkIcon,
-        onClick: handleLinkWorkspace,
-      },
+      ...(cloudFeaturesEnabled
+        ? [
+            {
+              icon: LinkIcon,
+              onClick: handleLinkWorkspace,
+            },
+          ]
+        : []),
     ],
-    [handleAddWorkspace, handleLinkWorkspace]
+    [cloudFeaturesEnabled, handleAddWorkspace, handleLinkWorkspace]
   );
 
   return (

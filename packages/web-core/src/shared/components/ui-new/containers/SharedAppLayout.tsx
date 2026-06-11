@@ -331,10 +331,8 @@ export function SharedAppLayout() {
 
   const openRelaySettings = useCallback(
     (hostId?: string) => {
-      if (!cloudFeaturesEnabled) return;
-
       void SettingsDialog.show({
-        initialSection: 'relay',
+        initialSection: cloudFeaturesEnabled ? 'relay' : 'direct-hosts',
         ...(hostId ? { initialState: { hostId } } : {}),
       });
     },
@@ -395,7 +393,7 @@ export function SharedAppLayout() {
             {/* Desktop AppBar sidebar. */}
             <AppBar
               projects={appBarProjects}
-              hosts={cloudFeaturesEnabled ? remoteCloudHosts : []}
+              hosts={remoteCloudHosts}
               activeHostId={activeHostId}
               onCreateProject={handleCreateProject}
               onExportClick={
@@ -403,8 +401,11 @@ export function SharedAppLayout() {
               }
               onWorkspacesClick={handleWorkspacesClick}
               onHostClick={handleHostClick}
-              onPairHostClick={
-                cloudFeaturesEnabled ? handlePairHostClick : undefined
+              onPairHostClick={handlePairHostClick}
+              remoteHostActionLabel={
+                cloudFeaturesEnabled
+                  ? 'Pair a remote device'
+                  : 'Add remote host'
               }
               onProjectClick={handleProjectClick}
               onProjectsDragEnd={handleProjectsDragEnd}
