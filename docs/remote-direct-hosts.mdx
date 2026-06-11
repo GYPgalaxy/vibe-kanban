@@ -18,6 +18,9 @@ Before you connect a new server, make sure you have:
 - A local Vibe Kanban instance running.
 - SSH key access from your local machine to the remote server.
 - Claude Code installed on the remote server.
+- A non-root remote user for the Vibe Kanban service. Claude Code rejects
+  `--dangerously-skip-permissions` when it is launched as `root` or through
+  `sudo`.
 - `sudo` access on the remote server if you want to install Node.js or create a systemd service.
 - Node.js `20.19.0` or newer on the remote server.
 
@@ -63,6 +66,10 @@ You should see:
 - The expected remote hostname and user.
 - A Claude Code version.
 - Node.js `20.19.0` or newer.
+
+If `whoami` returns `root`, create or choose a normal user first, then install
+or authenticate Claude Code for that user. Do not run the remote Vibe Kanban
+service as `root`.
 
 If Node.js is too old, install a newer version. One simple option is `n`:
 
@@ -143,6 +150,7 @@ Check the service:
 ```bash
 systemctl is-enabled vibe-kanban.service
 systemctl is-active vibe-kanban.service
+systemctl show vibe-kanban.service -p User --no-pager
 curl -fsS http://127.0.0.1:3000/api/health && echo
 ```
 
@@ -219,8 +227,26 @@ Check:
 The remote Node.js version is too old. Install Node.js `20.19.0` or newer, then run `npx -y vibe-kanban --help` again.
 </Accordion>
 
+<Accordion title="Claude Code says --dangerously-skip-permissions cannot run as root">
+Your remote Vibe Kanban service is running as `root` or through `sudo`. Change
+the systemd service to a normal user, then make sure stale runtime directories
+are writable by that user:
+
+```bash
+sudo systemctl stop vibe-kanban.service
+sudo chown -R "$USER:$USER" \
+  "$HOME/.vibe-kanban" \
+  "$HOME/.local/share/vibe-kanban" \
+  /tmp/vibe-kanban \
+  /var/tmp/vibe-kanban 2>/dev/null || true
+sudo systemctl start vibe-kanban.service
+systemctl show vibe-kanban.service -p User --no-pager
+```
+
+The `User=` value should be the normal SSH user, not `root`.
+</Accordion>
+
 <Accordion title="The host appears online but requests fail">
 Treat `/api/host/HOST_ID/health` as the source of truth. A saved host entry can exist even when the remote service is stopped.
 </Accordion>
 </AccordionGroup>
-
