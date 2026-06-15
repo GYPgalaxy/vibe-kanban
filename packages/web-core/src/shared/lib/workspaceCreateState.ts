@@ -84,6 +84,7 @@ export function toDraftWorkspaceData(
         repo_id: repo.repo_id,
         target_branch: repo.target_branch ?? '',
       })) ?? [],
+    has_user_touched_repos: false,
     executor_config: initialState.executorConfig ?? null,
     linked_issue: initialState.linkedIssue
       ? {

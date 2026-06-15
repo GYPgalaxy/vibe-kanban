@@ -178,6 +178,9 @@ pub struct DraftWorkspaceData {
     pub message: String,
     #[serde(default)]
     pub repos: Vec<DraftWorkspaceRepo>,
+    /// Whether the user has explicitly confirmed or modified the repo picker.
+    #[serde(default)]
+    pub has_user_touched_repos: bool,
     #[serde(default, alias = "selected_profile", alias = "config")]
     pub executor_config: Option<ExecutorConfig>,
     #[serde(default)]

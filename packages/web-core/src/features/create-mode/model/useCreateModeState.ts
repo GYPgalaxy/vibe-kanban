@@ -50,6 +50,12 @@ interface DraftState {
   linkedIssue: LinkedIssue | null;
   executorConfig: ExecutorConfig | null;
   attachments: DraftWorkspaceAttachment[];
+  /**
+   * Set once the user explicitly manipulates the repo selection (add / remove /
+   * set branch / clear). Prevents the auto-fallback effect that copies repos
+   * from the most recent workspace from clobbering the user's pick.
+   */
+  hasUserTouchedRepos: boolean;
 }
 
 type DraftAction =
@@ -86,6 +92,7 @@ const draftInitialState: DraftState = {
   linkedIssue: null,
   executorConfig: null,
   attachments: [],
+  hasUserTouchedRepos: false,
 };
 
 function draftReducer(state: DraftState, action: DraftAction): DraftState {
@@ -116,6 +123,7 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
           ...state.repos,
           { repo: action.repo, targetBranch: action.targetBranch },
         ],
+        hasUserTouchedRepos: true,
       };
     }
 
@@ -129,6 +137,7 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
       return {
         ...state,
         repos: state.repos.filter((r) => r.repo.id !== action.repoId),
+        hasUserTouchedRepos: true,
       };
 
     case 'SET_TARGET_BRANCH':
@@ -139,13 +148,14 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
             ? { ...r, targetBranch: action.branch }
             : r
         ),
+        hasUserTouchedRepos: true,
       };
 
     case 'SET_MESSAGE':
       return { ...state, message: action.message };
 
     case 'CLEAR_REPOS':
-      return { ...state, repos: [] };
+      return { ...state, repos: [], hasUserTouchedRepos: true };
 
     case 'CLEAR':
       return { ...draftInitialState, phase: 'ready' };
@@ -227,6 +237,7 @@ interface UseCreateModeStateResult {
   repos: Repo[];
   targetBranches: Record<string, string | null>;
   hasResolvedInitialRepoDefaults: boolean;
+  hasUserTouchedRepos: boolean;
   preferredExecutorConfig: ExecutorConfig | null;
   message: string;
   isLoading: boolean;
@@ -415,6 +426,8 @@ export function useCreateModeState({
     if (hasAppliedRepoDefaultsRef.current) return;
 
     hasAppliedRepoDefaultsRef.current = true;
+    // Never clobber an explicit user pick in the picker.
+    if (state.hasUserTouchedRepos) return;
     if (state.repos.length > 0) return;
     if (preferredRepos.length === 0) return;
 
@@ -429,6 +442,7 @@ export function useCreateModeState({
     shouldLoadWorkspaceDefaults,
     hasResolvedPreferredRepos,
     state.repos.length,
+    state.hasUserTouchedRepos,
     preferredRepos,
     projectDefaultsStatus,
     state.linkedIssue?.remoteProjectId,
@@ -443,6 +457,8 @@ export function useCreateModeState({
     const remoteProjectId = state.linkedIssue?.remoteProjectId;
     if (!remoteProjectId) return;
     if (state.repos.length > 0) return;
+    // Don't overwrite an explicit user pick.
+    if (state.hasUserTouchedRepos) return;
     if (scratchDefaultsProjectRef.current === remoteProjectId) return;
 
     scratchDefaultsProjectRef.current = remoteProjectId;
@@ -490,7 +506,11 @@ export function useCreateModeState({
     return () => {
       cancelled = true;
     };
-  }, [state.linkedIssue?.remoteProjectId, state.repos.length]);
+  }, [
+    state.linkedIssue?.remoteProjectId,
+    state.repos.length,
+    state.hasUserTouchedRepos,
+  ]);
 
   // ============================================================================
   // Persistence to scratch (debounced)
@@ -525,6 +545,7 @@ export function useCreateModeState({
         repo_id: r.repo.id,
         target_branch: r.targetBranch ?? '',
       })),
+      has_user_touched_repos: state.hasUserTouchedRepos,
       executor_config: state.executorConfig ?? null,
       linked_issue: state.linkedIssue
         ? {
@@ -540,6 +561,7 @@ export function useCreateModeState({
     state.phase,
     state.message,
     state.repos,
+    state.hasUserTouchedRepos,
     state.linkedIssue,
     state.executorConfig,
     state.attachments,
@@ -642,6 +664,7 @@ export function useCreateModeState({
     repos,
     targetBranches,
     hasResolvedInitialRepoDefaults,
+    hasUserTouchedRepos: state.hasUserTouchedRepos,
     preferredExecutorConfig,
     message: state.message,
     isLoading: scratchLoading,

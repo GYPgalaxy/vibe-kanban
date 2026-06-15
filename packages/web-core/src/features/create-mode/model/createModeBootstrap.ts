@@ -19,6 +19,7 @@ export interface CreateModeBootstrapData {
   message?: string;
   linkedIssue?: LinkedIssue | null;
   repos?: BootstrapSelectedRepo[];
+  hasUserTouchedRepos?: boolean;
   executorConfig?: ExecutorConfig | null;
   attachments?: DraftWorkspaceAttachment[];
 }
@@ -172,6 +173,8 @@ export async function resolveCreateModeBootstrap({
         data.repos = restoredRepos;
       }
     }
+
+    data.hasUserTouchedRepos = scratchData.has_user_touched_repos;
 
     return {
       source: 'scratch',

@@ -21,6 +21,12 @@ export interface CreateModeContextValue {
   targetBranches: Record<string, string | null>;
   setTargetBranch: (repoId: string, branch: string) => void;
   hasResolvedInitialRepoDefaults: boolean;
+  /**
+   * True once the user has explicitly manipulated the repo selection in the
+   * picker (add / remove / set branch / clear). Used to prevent automatic
+   * defaults (last workspace, project defaults) from clobbering the pick.
+   */
+  hasUserTouchedRepos: boolean;
   preferredExecutorConfig: ExecutorConfig | null;
   message: string;
   setMessage: (message: string) => void;

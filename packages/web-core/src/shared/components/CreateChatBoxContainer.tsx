@@ -49,6 +49,7 @@ export function CreateChatBoxContainer({
     clearDraft,
     hasInitialValue,
     hasResolvedInitialRepoDefaults,
+    hasUserTouchedRepos,
     linkedIssue,
     clearLinkedIssue,
     preferredExecutorConfig,
@@ -68,6 +69,16 @@ export function CreateChatBoxContainer({
     if (!hasInitialValue || hasInitializedStep) return;
     if (!hasSelectedRepos && !hasResolvedInitialRepoDefaults) return;
 
+    // Until the user has explicitly acted in the picker, always land on the
+    // picker step — even if scratch / last-workspace defaults pre-populated
+    // repos. This prevents the picker from flashing past and silently using
+    // an old repo the user never re-confirmed.
+    if (!hasUserTouchedRepos) {
+      setIsSelectingRepos(true);
+      setHasInitializedStep(true);
+      return;
+    }
+
     setIsSelectingRepos(!hasSelectedRepos);
     setHasInitializedStep(true);
   }, [
@@ -75,6 +86,7 @@ export function CreateChatBoxContainer({
     hasInitializedStep,
     hasSelectedRepos,
     hasResolvedInitialRepoDefaults,
+    hasUserTouchedRepos,
   ]);
 
   const showRepoPickerStep = !hasSelectedRepos || isSelectingRepos;

@@ -75,8 +75,15 @@ export function CreateModeRepoPickerBar({
 }: CreateModeRepoPickerBarProps) {
   const { t } = useTranslation('common');
   const queryClient = useQueryClient();
-  const { repos, targetBranches, addRepo, removeRepo, setTargetBranch } =
-    useCreateMode();
+  const {
+    repos,
+    targetBranches,
+    addRepo,
+    removeRepo,
+    clearRepos,
+    setTargetBranch,
+    hasUserTouchedRepos,
+  } = useCreateMode();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [branchRepoId, setBranchRepoId] = useState<string | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
@@ -141,11 +148,22 @@ export function CreateModeRepoPickerBar({
       const selectedBranch = await pickBranchForRepo(repo);
       if (!selectedBranch) return false;
 
+      if (!hasUserTouchedRepos && repos.length > 0) {
+        clearRepos();
+      }
       addRepo(repo);
       setTargetBranch(repo.id, selectedBranch);
       return true;
     },
-    [addRepo, pickBranchForRepo, selectedRepoIds, setTargetBranch]
+    [
+      addRepo,
+      clearRepos,
+      hasUserTouchedRepos,
+      pickBranchForRepo,
+      repos.length,
+      selectedRepoIds,
+      setTargetBranch,
+    ]
   );
 
   const handleChooseRepo = useCallback(async () => {
@@ -200,13 +218,14 @@ export function CreateModeRepoPickerBar({
       },
       'Failed to register repository'
     );
-  }, [addRepoWithBranchSelection, runPickerAction, t]);
+  }, [addRepoWithBranchSelection, queryClient, runPickerAction, t]);
 
   const handleCreateRepo = useCallback(async () => {
     await runPickerAction(
       'create',
       async () => {
-        await CreateRepoDialog.show({
+        let createdRepo: Repo | null = null;
+        const result = await CreateRepoDialog.show({
           onBrowseForPath: async (currentPath) =>
             FolderPickerDialog.show({
               title: t('git.createRepo.browseDialog.title'),
@@ -214,18 +233,21 @@ export function CreateModeRepoPickerBar({
               value: currentPath,
             }),
           onCreateRepo: async ({ parentPath, folderName }) => {
-            const repo = await repoApi.init({
+            createdRepo = await repoApi.init({
               parent_path: parentPath,
               folder_name: folderName,
             });
             queryClient.invalidateQueries({ queryKey: ['repos'] });
-            await addRepoWithBranchSelection(repo);
           },
         });
+
+        if (result.action === 'created' && createdRepo) {
+          await addRepoWithBranchSelection(createdRepo);
+        }
       },
       'Failed to create repository'
     );
-  }, [addRepoWithBranchSelection, runPickerAction, t]);
+  }, [addRepoWithBranchSelection, queryClient, runPickerAction, t]);
 
   const handleChangeBranch = useCallback(
     async (repo: Repo) => {
