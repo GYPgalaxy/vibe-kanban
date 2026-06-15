@@ -188,7 +188,7 @@
     "createRepo": {
       "dialog": {
         "title": "创建新仓库",
-        "description": "初始化新的git仓库"
+        "description": "初始化新的git仓库，或复用已有目录"
       },
       "form": {
         "nameLabel": "名称",

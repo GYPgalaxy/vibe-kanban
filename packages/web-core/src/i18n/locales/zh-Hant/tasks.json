@@ -188,7 +188,7 @@
     "createRepo": {
       "dialog": {
         "title": "建立新儲存庫",
-        "description": "初始化新的 Git 儲存庫"
+        "description": "初始化新的 Git 儲存庫，或重用現有資料夾"
       },
       "form": {
         "nameLabel": "名稱",

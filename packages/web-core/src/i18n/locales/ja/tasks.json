@@ -157,7 +157,7 @@
     "createRepo": {
       "dialog": {
         "title": "新しいリポジトリを作成",
-        "description": "新しいGitリポジトリを初期化"
+        "description": "新しいGitリポジトリを初期化、または既存のフォルダを再利用"
       },
       "form": {
         "nameLabel": "名前",

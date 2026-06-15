@@ -267,7 +267,7 @@
     "createRepo": {
       "dialog": {
         "title": "Create New Repository",
-        "description": "Initialize a new git repository"
+        "description": "Initialize a new git repository, or reuse an existing folder"
       },
       "form": {
         "nameLabel": "Name",

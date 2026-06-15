@@ -50,10 +50,6 @@ impl RepoService {
             return Err(RepoError::PathNotDirectory(path.to_path_buf()));
         }
 
-        if !path.join(".git").exists() {
-            return Err(RepoError::NotGitRepository(path.to_path_buf()));
-        }
-
         Ok(())
     }
 
@@ -64,11 +60,19 @@ impl RepoService {
     pub async fn register(
         &self,
         pool: &SqlitePool,
+        git: &GitService,
         path: &str,
         display_name: Option<&str>,
     ) -> Result<RepoModel> {
         let normalized_path = self.normalize_path(path)?;
         self.validate_git_repo_path(&normalized_path)?;
+
+        // If the directory is not already a git repository, initialize one in
+        // place so any existing directory can be registered. Repositories with
+        // existing history are left untouched (idempotent).
+        if !git.is_repo_openable(&normalized_path) {
+            git.initialize_repo_with_main_branch(&normalized_path)?;
+        }
 
         let name = normalized_path
             .file_name()
@@ -117,9 +121,10 @@ impl RepoService {
         }
 
         let repo_path = normalized_parent.join(folder_name);
-        if repo_path.exists() {
-            return Err(RepoError::DirectoryAlreadyExists(repo_path));
-        }
+        // Reuse the directory if it already exists instead of erroring. A
+        // non-git directory is initialized below; an existing git repository is
+        // left untouched (initialize_repo_with_main_branch is idempotent and
+        // preserves existing history).
 
         git.initialize_repo_with_main_branch(&repo_path)?;
 
@@ -186,5 +191,160 @@ impl RepoService {
 
         all_results.truncate(10);
         Ok(all_results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use git::GitService;
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use tempfile::TempDir;
+
+    use super::*;
+
+    /// Build an in-memory SQLite pool with the db crate's migrations applied,
+    /// so `find_or_create` has the `repos` table to work against.
+    async fn setup_pool() -> SqlitePool {
+        let options = SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::migrate!("../db/migrations").run(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test]
+    async fn init_repo_creates_repo_in_new_directory() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let parent = TempDir::new().unwrap();
+
+        let repo = service
+            .init_repo(&pool, &git, parent.path().to_str().unwrap(), "my-project")
+            .await
+            .unwrap();
+
+        let repo_path = parent.path().join("my-project");
+        assert!(repo_path.join(".git").exists());
+        assert!(git.is_repo_openable(&repo_path));
+        assert_eq!(repo.path, repo_path);
+        // main branch + initial commit exist
+        let head = git.get_head_info(&repo_path).unwrap();
+        assert_eq!(head.branch, "main");
+    }
+
+    #[tokio::test]
+    async fn init_repo_reuses_existing_empty_directory() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let parent = TempDir::new().unwrap();
+
+        // Pre-create the target directory (non-git, empty).
+        let repo_path = parent.path().join("existing");
+        std::fs::create_dir_all(&repo_path).unwrap();
+
+        let repo = service
+            .init_repo(&pool, &git, parent.path().to_str().unwrap(), "existing")
+            .await
+            .unwrap();
+
+        assert!(git.is_repo_openable(&repo_path));
+        assert_eq!(repo.path, repo_path);
+    }
+
+    #[tokio::test]
+    async fn init_repo_preserves_existing_history() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let parent = TempDir::new().unwrap();
+
+        // Set up a repo with a real commit first.
+        let repo_path = parent.path().join("with-history");
+        git.initialize_repo_with_main_branch(&repo_path).unwrap();
+        let original_oid = git.get_head_info(&repo_path).unwrap().oid;
+
+        // Re-running init_repo on the existing repo must not rewrite history.
+        let _repo = service
+            .init_repo(&pool, &git, parent.path().to_str().unwrap(), "with-history")
+            .await
+            .unwrap();
+
+        let after_oid = git.get_head_info(&repo_path).unwrap().oid;
+        assert_eq!(
+            after_oid, original_oid,
+            "existing repo history must not be rewritten"
+        );
+    }
+
+    #[tokio::test]
+    async fn init_repo_rejects_invalid_folder_name() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let parent = TempDir::new().unwrap();
+
+        let result = service
+            .init_repo(&pool, &git, parent.path().to_str().unwrap(), "bad/name")
+            .await;
+        assert!(matches!(result, Err(RepoError::InvalidFolderName(_))));
+    }
+
+    #[tokio::test]
+    async fn register_auto_inits_non_git_directory() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().to_str().unwrap();
+
+        // Fresh temp dir is not a git repo.
+        assert!(!git.is_repo_openable(dir.path()));
+
+        let repo = service.register(&pool, &git, path, None).await.unwrap();
+
+        assert!(git.is_repo_openable(dir.path()));
+        assert_eq!(repo.path, dir.path());
+    }
+
+    #[tokio::test]
+    async fn register_preserves_existing_git_repository() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+        let dir = TempDir::new().unwrap();
+
+        // Existing repo with history.
+        git.initialize_repo_with_main_branch(dir.path()).unwrap();
+        let original_oid = git.get_head_info(dir.path()).unwrap().oid;
+
+        let repo = service
+            .register(&pool, &git, dir.path().to_str().unwrap(), None)
+            .await
+            .unwrap();
+
+        let after_oid = git.get_head_info(dir.path()).unwrap().oid;
+        assert_eq!(after_oid, original_oid, "history must be untouched");
+        assert_eq!(repo.path, dir.path());
+    }
+
+    #[tokio::test]
+    async fn register_rejects_missing_path() {
+        let pool = setup_pool().await;
+        let service = RepoService::new();
+        let git = GitService::new();
+
+        let result = service
+            .register(&pool, &git, "/this/path/does/not/exist", None)
+            .await;
+        assert!(matches!(result, Err(RepoError::PathNotFound(_))));
     }
 }

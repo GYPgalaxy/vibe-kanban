@@ -180,7 +180,7 @@
     "createRepo": {
       "dialog": {
         "title": "새 저장소 만들기",
-        "description": "Git으로 추적되는 새 저장소를 만듭니다."
+        "description": "Git으로 추적되는 새 저장소를 만들거나, 기존 폴더를 재사용합니다."
       },
       "form": {
         "nameLabel": "저장소 이름",

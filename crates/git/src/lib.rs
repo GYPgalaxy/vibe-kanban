@@ -272,8 +272,14 @@ impl GitService {
                 .mkdir(true),
         )?;
 
-        // Create initial commit
-        self.create_initial_commit(&repo)?;
+        // Only create the initial commit when HEAD is unborn (no commits yet).
+        // This keeps the call idempotent and safe for repositories that already
+        // have history — create_initial_commit is otherwise destructive: it
+        // rewrites `refs/heads/main` to a parentless commit and orphans the
+        // existing history.
+        if repo.head().is_err() {
+            self.create_initial_commit(&repo)?;
+        }
 
         Ok(())
     }

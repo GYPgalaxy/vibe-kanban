@@ -267,7 +267,7 @@
     "createRepo": {
       "dialog": {
         "title": "Créer un nouveau dépôt",
-        "description": "Initialiser un nouveau dépôt git"
+        "description": "Initialiser un nouveau dépôt git, ou réutiliser un dossier existant"
       },
       "form": {
         "nameLabel": "Nom",
