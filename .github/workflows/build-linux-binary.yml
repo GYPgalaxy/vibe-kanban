@@ -1,0 +1,115 @@
+name: Build linux binary (internal fork)
+
+# Builds the vibe-kanban server binary for linux-x64 (musl, statically linked)
+# from THIS fork's source — which carries fixes (e.g. bff07bfc, the create-mode
+# repo-reuse change) that are NOT published to npm / the upstream R2 — and
+# publishes the zip to a rolling GitHub Release on this repo.
+#
+# Why a self-hosted channel: `npx -y vibe-kanban` only fetches the upstream
+# published build, so it can never carry this fork's commits. Pull the artifact
+# produced here onto the ECS host and replace the cached binary to upgrade the
+# systemd service (see the ECS upgrade notes in the release).
+#
+# No private deps required: `-p server` resolves only to in-workspace path
+# crates (crates/remote is not a workspace member and not a server dependency).
+# PostHog/Sentry are left unset → analytics disabled.
+#
+# Add arm64: turn TARGET/PLATFORM into a matrix and run both.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Rolling release tag to publish to"
+        required: false
+        default: internal-latest
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "packages/local-web/**"
+      - "packages/web-core/**"
+      - "packages/ui/**"
+      - "Cargo.lock"
+      - ".github/workflows/build-linux-binary.yml"
+
+# To switch the substrate to your own Cloudflare R2 (instead of GitHub
+# Releases), set R2 secrets and replace the "Publish" step with aws s3 cp to
+#   s3://$R2_BINARIES_BUCKET/binaries/internal-latest/$PLATFORM/vibe-kanban.zip
+# mirroring the upstream npx manifest layout if you want `npx` to find it.
+
+env:
+  NODE_VERSION: "22.22.1"
+  TARGET: x86_64-unknown-linux-musl
+  PLATFORM: linux-x64
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The server binary embeds the frontend via rust_embed
+      # (#[folder = "../../packages/local-web/dist"]), so build it first.
+      - name: Build frontend (embedded into the server binary)
+        run: pnpm --filter @vibe/local-web run build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: ${{ env.TARGET }}
+
+      # Pinned to the exact zig + cargo-zigbuild combo proven in pre-release.yml.
+      - name: Setup Zig (for cargo-zigbuild musl linking)
+        uses: BloopAI/setup-zig@main
+        with:
+          version: 0.15.2
+
+      - name: Install cargo-zigbuild
+        uses: taiki-e/cache-cargo-install-action@34ce5120836e5f9f1508d8713d7fdea0e8facd6f # v3.0.1
+        with:
+          tool: cargo-zigbuild
+          git: https://github.com/rust-cross/cargo-zigbuild
+          rev: bbb57ac6a5eb90f53617a5c218fda03080599e4a # v0.20.1
+
+      - name: Build server (musl, static)
+        run: cargo zigbuild --release --target ${{ env.TARGET }} -p server --bin server
+        env:
+          SQLX_OFFLINE: "true"
+
+      - name: Package binary
+        run: |
+          mkdir -p dist
+          cp target/${{ env.TARGET }}/release/server dist/vibe-kanban
+          (cd dist && zip -q vibe-kanban-${{ env.PLATFORM }}.zip vibe-kanban)
+          sha256sum dist/vibe-kanban-${{ env.PLATFORM }}.zip \
+            | tee dist/vibe-kanban-${{ env.PLATFORM }}.zip.sha256
+
+      - name: Publish to rolling GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.release_tag || 'internal-latest' }}"
+          gh release create "$TAG" \
+            --title "Internal build (${{ env.PLATFORM }})" \
+            --notes "Auto-built linux-x64 (musl) vibe-kanban server from $GITHUB_SHA." \
+            --prerelease || true
+          gh release upload "$TAG" \
+            dist/vibe-kanban-${{ env.PLATFORM }}.zip \
+            dist/vibe-kanban-${{ env.PLATFORM }}.zip.sha256 \
+            --clobber
+          echo "::notice::Download: https://github.com/${{ github.repository }}/releases/download/${TAG}/vibe-kanban-${{ env.PLATFORM }}.zip"
