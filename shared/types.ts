@@ -516,7 +516,11 @@ export type DiffStats = { files_changed: number, lines_added: number, lines_remo
 
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, last_modified: bigint | null, };
 
-export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_path: string, };
+export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_path: string,
+/**
+ * Whether `current_path` itself is a git repository (has a `.git` dir).
+ */
+is_git_repo: boolean, };
 
 export type SearchMode = "taskform" | "settings";
 

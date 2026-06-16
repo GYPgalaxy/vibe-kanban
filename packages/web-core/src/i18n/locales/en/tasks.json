@@ -269,6 +269,11 @@
         "title": "Create New Repository",
         "description": "Initialize a new git repository, or reuse an existing folder"
       },
+      "openDialog": {
+        "title": "Open Existing Repository",
+        "description": "This location is already a git repository",
+        "note": "This path is already a git repository — it will be opened as-is."
+      },
       "form": {
         "nameLabel": "Name",
         "namePlaceholder": "my-project",
@@ -284,10 +289,12 @@
         "createFailed": "Failed to create repository"
       },
       "buttons": {
-        "createRepository": "Create Repository"
+        "createRepository": "Create Repository",
+        "openRepository": "Open Repository"
       },
       "states": {
-        "creating": "Creating..."
+        "creating": "Creating...",
+        "opening": "Opening..."
       }
     }
   },

@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { Repo } from 'shared/types';
 import type { BranchItem, RepoItem } from '@/shared/types/selectionItems';
-import { repoApi } from '@/shared/lib/api';
+import { fileSystemApi, repoApi } from '@/shared/lib/api';
 import { cn } from '@/shared/lib/utils';
 import { useCreateMode } from '@/features/create-mode/model/useCreateMode';
 import { FolderPickerDialog } from '@/shared/dialogs/shared/FolderPickerDialog';
@@ -232,6 +232,15 @@ export function CreateModeRepoPickerBar({
               description: t('git.createRepo.browseDialog.description'),
               value: currentPath,
             }),
+          resolveLocationInfo: async (path) => {
+            try {
+              const { is_git_repo } = await fileSystemApi.list(path);
+              return { exists: true, isGitRepo: !!is_git_repo };
+            } catch {
+              // Path missing / not a directory → fall back to create mode.
+              return { exists: false, isGitRepo: false };
+            }
+          },
           onCreateRepo: async ({ parentPath, folderName }) => {
             createdRepo = await repoApi.init({
               parent_path: parentPath,
@@ -239,9 +248,16 @@ export function CreateModeRepoPickerBar({
             });
             queryClient.invalidateQueries({ queryKey: ['repos'] });
           },
+          onOpenExistingRepo: async (path) => {
+            createdRepo = await repoApi.register({ path });
+            queryClient.invalidateQueries({ queryKey: ['repos'] });
+          },
         });
 
-        if (result.action === 'created' && createdRepo) {
+        if (
+          (result.action === 'created' || result.action === 'opened') &&
+          createdRepo
+        ) {
           await addRepoWithBranchSelection(createdRepo);
         }
       },

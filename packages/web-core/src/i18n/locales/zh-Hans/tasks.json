@@ -190,6 +190,11 @@
         "title": "创建新仓库",
         "description": "初始化新的git仓库，或复用已有目录"
       },
+      "openDialog": {
+        "title": "打开已有仓库",
+        "description": "该位置已经是 git 仓库",
+        "note": "该路径已经是 git 仓库，将直接打开，不再新建。"
+      },
       "form": {
         "nameLabel": "名称",
         "namePlaceholder": "my-project",
@@ -205,10 +210,12 @@
         "createFailed": "创建仓库失败"
       },
       "buttons": {
-        "createRepository": "创建仓库"
+        "createRepository": "创建仓库",
+        "openRepository": "打开仓库"
       },
       "states": {
-        "creating": "创建中..."
+        "creating": "创建中...",
+        "opening": "打开中..."
       }
     }
   },

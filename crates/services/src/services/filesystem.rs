@@ -29,6 +29,8 @@ pub enum FilesystemError {
 pub struct DirectoryListResponse {
     pub entries: Vec<DirectoryEntry>,
     pub current_path: String,
+    /// Whether `current_path` itself is a git repository (has a `.git` dir).
+    pub is_git_repo: bool,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -360,6 +362,7 @@ impl FilesystemService {
         Ok(DirectoryListResponse {
             entries: directory_entries,
             current_path: path.to_string_lossy().to_string(),
+            is_git_repo: path.join(".git").exists(),
         })
     }
 }
